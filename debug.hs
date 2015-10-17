@@ -1,2 +1,3 @@
-debugNumber :: (Num a) => a -> a
-debugNumber x = x
+data LV = Integer Integer
+        | Float Float
+        | Rational Integer Integer
