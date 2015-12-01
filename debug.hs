@@ -1,5 +1,4 @@
 {-# LANGUAGE QuasiQuotes #-}
--- cat
 import Text.ParserCombinators.Parsec hiding (spaces)
 import Data.String.Interpolate
 import Data.List
