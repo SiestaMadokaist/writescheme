@@ -2,6 +2,7 @@ module Ramadoka.Parser.Schemer
 ( showVal,
   readExpr,
   getExpr,
+  LispNumber(..),
   LispVal(..)
 ) where
     import Text.ParserCombinators.Parsec hiding (spaces)
@@ -57,44 +58,35 @@ module Ramadoka.Parser.Schemer
     parseExponentiable :: LispNumber -> Parser LispVal
     parseExponentiable (Integer base) = do
             char 'e'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                exponent = read xs :: Integer
+            xs <- many1 digit
+            let exponent = read xs :: Integer
             return $ LispNumber $ Integer $ base * (10 ^ exponent)
     parseExponentiable (Float base) = do
             char 'e'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                exponent = read xs :: Float
+            xs <- many1 digit
+            let exponent = read xs :: Float
             return $ LispNumber $ Float $ base * 10 ** exponent
-    parseExponentiable (Rational dividend divisor)= do
+    parseExponentiable (Rational dividend divisor) = do
             char 'e'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                exponent = read xs :: Integer
+            xs <- many1 digit
+            let exponent = read xs :: Integer
                 dividend2 = dividend * (10 ^ exponent)
             return $ LispNumber $ Rational dividend2 divisor
 
     parseFloatingPoint :: LispNumber -> Parser LispVal
     parseFloatingPoint (Float f) = do
            char '.'
-           x <- digit
-           xx <- many digit
-           let xs = x:xx
-               decimalPoint = read ("0." ++ xs) :: Float
+           xs <- many1 digit
+           let decimalPoint = read ("0." ++ xs) :: Float
                floatValue = f + decimalPoint
+               -- TODO: what is do .. return equivalent
                parseFloat = do
                     return $ LispNumber $ Float floatValue
            (parseExponentiable $ Float floatValue) <|> parseFloat
     parseFloatingPoint (Integer i) = do
             char '.'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                decimalPoint = read xs :: Integer
+            xs <- many1 digit
+            let decimalPoint = read xs :: Integer
                 divisor = 10 ^ length xs
                 iBig = i * divisor
                 dividend = iBig + decimalPoint
@@ -107,20 +99,16 @@ module Ramadoka.Parser.Schemer
     parseInexactNumber :: Parser LispVal
     parseInexactNumber = do
             char 'i'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                bigNum = read xs :: Float
+            xs <- many1 digit
+            let bigNum = read xs :: Float
                 fbigNum = Float bigNum
             (parseExponentiable fbigNum) <|> (parseFloatingPoint fbigNum)
 
     parseExactNumber ::  Parser LispVal
     parseExactNumber = do
             char 'e'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                bigNum = read xs :: Integer
+            xs <- many1 digit
+            let bigNum = read xs :: Integer
                 ibigNum = Integer bigNum
                 parseInt = do
                     return $ LispNumber ibigNum
@@ -129,19 +117,15 @@ module Ramadoka.Parser.Schemer
     parseDecimal :: Parser LispVal
     parseDecimal = do
             char 'd'
-            x <- digit
-            xx <- many digit
-            let xs = x:xx
-                ibigNum = read xs :: Integer
+            xs <- many1 digit
+            let ibigNum = read xs :: Integer
                 fbigNum = read xs :: Float
             (parseExponentiable $ Integer ibigNum) <|> (parseFloatingPoint $ Float fbigNum)
 
     parseDigit :: Parser LispVal
     parseDigit = do
-            x <- digit
-            xx <- many digit
+            xs <- many1 digit
             let ibigNum = read xs :: Integer
-                xs = x:xx
                 fbigNum = read xs :: Float
                 parseBasicDigit = do
                     return $ LispNumber $ Integer ibigNum
@@ -181,25 +165,31 @@ module Ramadoka.Parser.Schemer
     spaces :: Parser ()
     spaces = skipMany1 space
 
-    parseEndList :: [LispVal] -> Parser LispVal
-    parseEndList cumulated = do
-            many spaces
-            char ')'
-            return $ List cumulated
-
-    parseInsideList :: [LispVal] -> Parser LispVal
-    parseInsideList cumulated = do
-            many spaces
-            expr <- parseExpr
-            (try $ parseInsideList $ expr:cumulated) <|> (try $ parseEndList $ expr:cumulated)
+    spaceOrDots :: Parser ()
+    spaceOrDots = do
+            skipMany spaces
+            char '.'
+            skipMany spaces
 
     parseList :: Parser LispVal
     parseList = do
             char '('
             exprs <- sepBy parseExpr spaces
-            --- exprs <- (try $ parseInsideList []) <|> (try $ parseEndList [])
             char ')'
             return $ List exprs
+
+    parseDottedList :: Parser LispVal
+    parseDottedList = do
+            char '('
+            exprs <- sepBy parseExpr spaceOrDots
+            char ')'
+            let lst = last exprs
+                ints = init exprs
+            return $ DottedList ints lst
+
+    parseDotOrNormalList :: Parser LispVal
+    parseDotOrNormalList = do
+            (try parseList) <|> (try parseDottedList)
 
     parseQuoted :: Parser LispVal
     parseQuoted = do
@@ -208,7 +198,7 @@ module Ramadoka.Parser.Schemer
             return $ Quoted exprs
 
     parseExpr :: Parser LispVal
-    parseExpr = parseString <|> parseDigit <|> parseAtom <|> parseSymbol <|> parseList <|> parseQuoted
+    parseExpr = parseString <|> parseDigit <|> parseAtom <|> parseSymbol <|> parseDotOrNormalList <|> parseQuoted
 
     getExpr :: String -> Either ParseError LispVal
     getExpr = parse parseExpr "lisp"
