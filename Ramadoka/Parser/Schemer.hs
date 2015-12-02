@@ -79,9 +79,7 @@ module Ramadoka.Parser.Schemer
            xs <- many1 digit
            let decimalPoint = read ("0." ++ xs) :: Float
                floatValue = f + decimalPoint
-               -- TODO: what is do .. return equivalent
-               parseFloat = do
-                    return $ LispNumber $ Float floatValue
+               parseFloat = return $ LispNumber $ Float floatValue
            (parseExponentiable $ Float floatValue) <|> parseFloat
     parseFloatingPoint (Integer i) = do
             char '.'
@@ -91,8 +89,7 @@ module Ramadoka.Parser.Schemer
                 iBig = i * divisor
                 dividend = iBig + decimalPoint
                 rationalValue = Rational dividend divisor
-                parseInt = do
-                    return $ LispNumber $ rationalValue
+                parseInt = return $ LispNumber $ rationalValue
             (parseExponentiable rationalValue) <|> parseInt
 
     -- s42
@@ -110,8 +107,7 @@ module Ramadoka.Parser.Schemer
             xs <- many1 digit
             let bigNum = read xs :: Integer
                 ibigNum = Integer bigNum
-                parseInt = do
-                    return $ LispNumber ibigNum
+                parseInt = return $ LispNumber ibigNum
             (parseExponentiable ibigNum) <|> (parseFloatingPoint ibigNum) <|> parseInt
 
     parseDecimal :: Parser LispVal
@@ -127,8 +123,7 @@ module Ramadoka.Parser.Schemer
             xs <- many1 digit
             let ibigNum = read xs :: Integer
                 fbigNum = read xs :: Float
-                parseBasicDigit = do
-                    return $ LispNumber $ Integer ibigNum
+                parseBasicDigit = return $ LispNumber $ Integer ibigNum
             (parseExponentiable $ Integer ibigNum) <|> (parseFloatingPoint $ Float fbigNum) <|> parseBasicDigit
 
     parseChar :: Parser LispVal
