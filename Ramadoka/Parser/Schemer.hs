@@ -23,7 +23,7 @@ module Ramadoka.Parser.Schemer
         | Bool Bool
         | LispNumber LispNumber
         | Quoted LispVal
-        deriving (Eq, Show)
+        deriving (Eq)
 
     showVal :: LispVal -> String
     showVal (String s) = "String " ++ s
@@ -34,6 +34,9 @@ module Ramadoka.Parser.Schemer
     showVal (DottedList x y) = "wat dotted"
     showVal (Atom a) = "Atom " ++ a
     showVal (Quoted x) = "`" ++ showVal x ++ ""
+
+    instance Show LispVal where
+      show = showVal
 
     unwordsList :: [LispVal] -> String
     unwordsList = (intercalate ", ") . (map showVal)
