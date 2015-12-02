@@ -41,6 +41,13 @@ module Ramadoka.Parser.SchemerSpec where
       it "read Float" $ do
         exprTest "2.3" `shouldBe` (RS.LispNumber $ RS.Float 2.3)
 
+      it "readExponential" $ do
+        -- need to be simplified ?
+        exprTest "#e2.30e1" `shouldBe` (RS.LispNumber $ RS.Rational 2300 100)
+
+      it "read InexactNumber" $ do
+        exprTest "#i2.33" `shouldBe` (RS.LispNumber $ RS.Float 2.33)
+
       it "read Rational" $ do
         exprTest "#e0.3" `shouldBe` (RS.LispNumber $ RS.Rational 3 10)
 
