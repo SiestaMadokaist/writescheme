@@ -22,7 +22,6 @@ module Ramadoka.Parser.Schemer
         | Char Char
         | Bool Bool
         | LispNumber LispNumber
-        | Quoted LispVal
         deriving (Eq)
 
     showVal :: LispVal -> String
@@ -33,7 +32,6 @@ module Ramadoka.Parser.Schemer
     showVal (List xs) = "(" ++ unwordsList xs ++ ")"
     showVal (DottedList x y) = "wat dotted"
     showVal (Atom a) = "Atom " ++ a
-    showVal (Quoted x) = "`" ++ showVal x ++ ""
 
     instance Show LispVal where
       show = showVal
@@ -193,7 +191,7 @@ module Ramadoka.Parser.Schemer
     parseQuoted = do
             char '`'
             exprs <- parseExpr
-            return $ Quoted exprs
+            return $ List [Atom "quote", exprs]
 
     parseExpr :: Parser LispVal
     parseExpr = parseString <|> parseDigit <|> parseAtom <|> parseSymbol <|> parseDotOrNormalList <|> parseQuoted

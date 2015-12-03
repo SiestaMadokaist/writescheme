@@ -24,14 +24,13 @@ module Ramadoka.Parser.SchemerSpec where
         exprTest "(Hello Atom F)" `shouldBe` (RS.List [RS.Atom "Hello", RS.Atom "Atom", RS.Atom "F"])
 
       it "read Quoted List" $ do
-        exprTest "`(Hello + World)" `shouldBe` (RS.Quoted $ RS.List [RS.Atom "Hello", RS.Atom "+", RS.Atom "World"])
+        exprTest "`(Hello + World)" `shouldBe` (RS.List [RS.Atom "quote", RS.List [RS.Atom "Hello", RS.Atom "+", RS.Atom "World"]])
 
       it "read Quoted expression" $ do
-        exprTest "`Hello" `shouldBe` (RS.Quoted $ RS.Atom "Hello")
+        exprTest "`Hello" `shouldBe` (RS.List [RS.Atom "quote", RS.Atom "Hello"])
 
       it "read Quoted DottedList" $ do
-        exprTest "`(Hello . Atom)" `shouldBe` (RS.Quoted $ RS.DottedList [RS.Atom "Hello"] (RS.Atom "Atom"))
-
+        exprTest "`(Hello . Atom)" `shouldBe` (RS.List [RS.Atom "quote", (RS.DottedList [RS.Atom "Hello"] (RS.Atom "Atom"))])
       it "read DottedList" $ do
         exprTest "(\"hello\" . 2)" `shouldBe` (RS.DottedList [RS.String "hello"] (RS.LispNumber $ RS.Integer 2))
 
