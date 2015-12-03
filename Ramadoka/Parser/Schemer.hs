@@ -199,6 +199,12 @@ module Ramadoka.Parser.Schemer
     getExpr :: String -> Either ParseError LispVal
     getExpr = parse parseExpr "lisp"
 
+    eval :: LispVal -> LispVal
+    eval val@(String _) = val
+    eval val@(LispNumber _) = val
+    eval val@(Bool _) = val
+    eval (List [Atom "quote", val]) = val
+
     readExpr :: String -> String
     readExpr input = errPrint $ getExpr input
 
