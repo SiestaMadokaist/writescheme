@@ -205,10 +205,12 @@ module Ramadoka.Parser.Schemer
     eval val@(Bool _) = val
     eval (List [Atom "quote", val]) = val
 
+    takeRight :: Either ParseError LispVal -> LispVal
+    takeRight (Right val) = val
+
     readExpr :: String -> String
     readExpr input = errPrint $ getExpr input
 
     main :: IO()
-    main = do
-        (expr:_) <- getArgs
-        putStrLn (readExpr expr)
+    main = getArgs >>= print . eval . takeRight . getExpr . head
+
