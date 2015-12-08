@@ -13,6 +13,11 @@ module Ramadoka.Parser.SchemerSpec where
 
   spec :: Spec
   spec = do
+    describe "showVal" $ do
+      it "print DottedList correctly" $ do
+        let dottedList = RS.showVal . exprTest $ "(Hello . 5 . X)"
+        dottedList `shouldBe` "(Atom Hello, Integer 5 . Atom X)"
+
     describe "getExpr" $ do
       it "read Atom" $ do
         exprTest "test" `shouldBe` (RS.Atom "test")

@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 module Ramadoka.Parser.Schemer
 ( showVal,
   readExpr,
@@ -9,6 +10,7 @@ module Ramadoka.Parser.Schemer
     import Data.List
     import System.Environment
     import Control.Monad as M
+    import Data.String.Interpolate
 
     data LispNumber = Integer Integer
                     | Float Float
@@ -30,7 +32,9 @@ module Ramadoka.Parser.Schemer
     showVal (Bool b) = show b
     showVal (LispNumber x) = show x
     showVal (List xs) = "(" ++ unwordsList xs ++ ")"
-    showVal (DottedList x y) = "wat dotted"
+    showVal (DottedList head tail) = [i|(#{unwordHead} . #{showValTail})|]
+      where unwordHead = unwordsList head
+            showValTail = showVal tail
     showVal (Atom a) = "Atom " ++ a
 
     instance Show LispVal where
@@ -213,4 +217,3 @@ module Ramadoka.Parser.Schemer
 
     main :: IO()
     main = getArgs >>= print . eval . takeRight . getExpr . head
-
