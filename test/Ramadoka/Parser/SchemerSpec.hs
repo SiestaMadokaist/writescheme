@@ -19,6 +19,12 @@ module Ramadoka.Parser.SchemerSpec where
         dottedList `shouldBe` "(Atom Hello, Integer 5 . Atom X)"
 
     describe "getExpr" $ do
+      it "read Test 4.1 correctly" $ do
+        -- from the write yourself a scheme
+        -- Evaluation Part 1
+        exprTest "`(1 3 (\"this\" \"one\"))" `shouldBe` (RS.String "x")
+
+
       it "read Atom" $ do
         exprTest "test" `shouldBe` (RS.Atom "test")
 

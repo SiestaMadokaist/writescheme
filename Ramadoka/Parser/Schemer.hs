@@ -35,7 +35,7 @@ module Ramadoka.Parser.Schemer
     showVal (DottedList head tail) = [i|(#{unwordHead} . #{showValTail})|]
       where unwordHead = unwordsList head
             showValTail = showVal tail
-    showVal (Atom a) = "Atom " ++ a
+    showVal (Atom a) = [i|Atom #{a}|]
 
     instance Show LispVal where
       show = showVal
@@ -208,6 +208,22 @@ module Ramadoka.Parser.Schemer
     eval val@(LispNumber _) = val
     eval val@(Bool _) = val
     eval (List [Atom "quote", val]) = val
+    eval (List [Atom func : args]) = apply func $ map eval args
+
+    apply :: String -> [LispVal] -> LispVal
+    apply func args = maybe (Bool False) ($ args) $ lookup func primitives
+
+    primitives :: [(String, [LispVal] -> LispVal)]
+    primitives = [
+                   ("+", numericBinop (+)),
+                   ("-", numericBinop (-)),
+                   ("*", numericBinop (*)),
+                   ("/", numericBinop (/)),
+                   ("mod", numericBinop mod),
+                   ("quotient", numericBinop quot),
+                   ("remainder", numericBinop remainder)
+                 ]
+
 
     takeRight :: Either ParseError LispVal -> LispVal
     takeRight (Right val) = val
