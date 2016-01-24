@@ -13,6 +13,11 @@ module Ramadoka.Parser.SchemerSpec where
 
   spec :: Spec
   spec = do
+    describe "eval" $ do
+      it "evaluate mathematic correctly" do
+        eval "4 + 3" `shouldBe` (RS.Integer Integer 7)
+      -- end
+
     describe "showVal" $ do
       it "print DottedList correctly" $ do
         let dottedList = RS.showVal . exprTest $ "(Hello . 5 . X)"
@@ -23,7 +28,6 @@ module Ramadoka.Parser.SchemerSpec where
         -- from the write yourself a scheme
         -- Evaluation Part 1
         exprTest "`(1 3 (\"this\" \"one\"))" `shouldBe` (RS.String "x")
-
 
       it "read Atom" $ do
         exprTest "test" `shouldBe` (RS.Atom "test")

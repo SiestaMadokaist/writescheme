@@ -208,7 +208,7 @@ module Ramadoka.Parser.Schemer
     eval val@(LispNumber _) = val
     eval val@(Bool _) = val
     eval (List [Atom "quote", val]) = val
-    eval (List [Atom func : args]) = apply func $ map eval args
+    eval (List [Atom func, args]) = apply func $ map eval args
 
     apply :: String -> [LispVal] -> LispVal
     apply func args = maybe (Bool False) ($ args) $ lookup func primitives
@@ -220,9 +220,12 @@ module Ramadoka.Parser.Schemer
                    ("*", numericBinop (*)),
                    ("/", numericBinop (/)),
                    ("mod", numericBinop mod),
-                   ("quotient", numericBinop quot),
-                   ("remainder", numericBinop remainder)
+                   ("quotient", numericBinop quot)
+                   -- ("remainder", numericBinop remainder)
                  ]
+
+    numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
+    numericBinop (+) params = foldl 0 params
 
 
     takeRight :: Either ParseError LispVal -> LispVal
