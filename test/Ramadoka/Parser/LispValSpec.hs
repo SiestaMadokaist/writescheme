@@ -7,12 +7,50 @@ module Ramadoka.Parser.SchemerSpec where
 
   -- method to easify testing
   -- how do I handle error here anyway?
-  exprTest :: String -> LispVal
-  exprTest input = case getExpr input of
+  runParser :: String -> LispVal
+  runParser input = case getExpr input of
                      (Right val) -> val
+                     (Left err) -> LFailure (show err)
+
+  runEval :: String -> LispVal
+  runEval input = eval $ runParser input
 
   spec :: Spec
   spec = do
+    describe "eval" $ do
+      let fGT (LFloat f1) (LFloat f2) = f1 > f2
+      let fLT (LFloat f1) (LFloat f2) = f1 < f2
+      describe "numeric evaluation" $ do
+        it "works on multiple values" $ do
+          runEval "(+ 5 3 2)" `shouldBe` LInteger 10
+        it "works on addition between integer and integer" $ do
+          runEval "(+ 5 3)" `shouldBe` LInteger 8
+        it "works on addition between integer and rational" $ do
+          runEval "(+ 5 #e3.2)" `shouldBe` LRational 41 5
+        it "works on addition between integer and float" $ do
+          let queryString = "(+ 5 3.2)"
+          runEval queryString `shouldSatisfy` (`fGT` LFloat 8.1)
+          runEval queryString `shouldNotSatisfy` (`fGT` LFloat 8.3)
+        it "works on addition between rational and rational" $ do
+          runEval "(+ #e3.2 #e3.2)" `shouldBe` runEval "#e6.4"
+        it "works on addition between rational and float" $ do
+          let result = runEval "(+ #e2.6 #i1.3)"
+              -- specifically choosen number which addition doesn't equal
+              -- to its exact value
+          result `shouldNotBe` runEval "#i3.9"
+          result `shouldSatisfy` (`fGT` LFloat 3.89)
+          result `shouldSatisfy` (`fLT` LFloat 3.91)
+        it "works on addition between float and float" $ do
+          let result = runEval "(+ #i2.6 #i1.3)"
+          result `shouldNotBe` runEval "#i3.9"
+          result `shouldSatisfy` (`fGT` LFloat 3.89)
+          result `shouldSatisfy` (`fLT` LFloat 3.91)
+        it "works on substraction between integer and integer" $ do
+          runEval "(- 5 3)" `shouldBe` runEval "#e2"
+        it "works on substraction between integer and rational" $ do
+          runEval "(- 5 #e3.2)" `shouldBe` runEval "#e1.8"
+          runEval "(- 5 #e1.2 #e1.2)" `shouldBe` runEval "#e2.6"
+
     describe "normalizeRational" $ do
       it "is correct" $ do
         normalizeRational 12 10 `shouldBe` LRational 6 5
@@ -20,33 +58,61 @@ module Ramadoka.Parser.SchemerSpec where
         normalizeRational 1200 10 `shouldBe` LRational 120 1
 
     describe "getExpr" $ do
+      describe "parseString" $ do
+        it "parse normal string" $ do
+          runParser "\"hello\"" `shouldBe` LString "hello"
+        it "parse escaped string" $ do
+          runParser "\"hello\\\" world\"" `shouldBe` LString "hello\" world"
 
       describe "parseNumber" $ do
         it "works on integer" $ do
-          exprTest "3" `shouldBe` LInteger 3
+          runParser "3" `shouldBe` LInteger 3
         it "works on powered integer" $ do
-          exprTest "3e2" `shouldBe` LInteger 300
+          runParser "3e2" `shouldBe` LInteger 300
         it "works on float" $ do
-          exprTest "3.2" `shouldBe` LFloat 3.2
+          runParser "3.2" `shouldBe` LFloat 3.2
         it "works on powered float" $ do
-          exprTest "3.2e1" `shouldBe` LFloat 32.0
+          runParser "3.2e1" `shouldBe` LFloat 32.0
 
       describe "parseInexactNumber" $ do
         it "works on integer-like" $ do
-          exprTest "#i3" `shouldBe` (LFloat 3.0)
+          runParser "#i3" `shouldBe` (LFloat 3.0)
         it "works on powered-integer-like" $ do
-          exprTest "#i3e1" `shouldBe` (LFloat 30.0)
+          runParser "#i3e1" `shouldBe` (LFloat 30.0)
         it "works on floating point" $ do
-          exprTest "#i3.2" `shouldBe` (LFloat 3.2)
+          runParser "#i3.2" `shouldBe` (LFloat 3.2)
         it "works on powered-floating-point" $ do
-          exprTest "#i3.2e1" `shouldBe` (LFloat 32.0)
+          runParser "#i3.2e1" `shouldBe` (LFloat 32.0)
 
       describe "parseExactNumber" $ do
         it "works on integer" $ do
-          exprTest "#e3" `shouldBe` (LInteger 3)
+          runParser "#e3" `shouldBe` (LInteger 3)
         it "works on float" $ do
-          exprTest "#e3.2" `shouldBe` (LRational 16 5)
+          runParser "#e3.2" `shouldBe` (LRational 16 5)
         it "works on powered integer" $ do
-          exprTest "#e3e5" `shouldBe` (LInteger 300000)
+          runParser "#e3e5" `shouldBe` (LInteger 300000)
         it "works on powered float" $ do
-          exprTest "#e3.12e1" `shouldBe` (LRational 156 5)
+          runParser "#e3.12e1" `shouldBe` (LRational 156 5)
+
+      describe "parseList" $ do
+        it "works on variable of the same type" $ do
+          runParser "(hello world)" `shouldBe` LList [LAtom "hello", LAtom "world"]
+        it "works on variable of different type" $ do
+          runParser "(hello \"world\" 5)" `shouldBe` LList [LAtom "hello",  LString "world", LInteger 5]
+        it "works on nested list" $ do
+          runParser "(hello (world))" `shouldBe` LList [LAtom "hello", LList [LAtom "world"] ]
+        it "works on empty nested list" $ do
+          runParser "(hello ())" `shouldBe` LList [LAtom "hello", LList []]
+        it "works on quotedList" $ do
+          runParser "(hello `(hello))" `shouldBe` LList [LAtom "hello", LList [LAtom "quote", LList [LAtom "hello"]]]
+
+      describe "parseQuoted" $ do
+        it "works on single valued" $ do
+          runParser "`5" `shouldBe` LList [LAtom "quote", LInteger 5]
+        it "works on values inside list" $ do
+          runParser "`(hello world)" `shouldBe` LList [LAtom "quote", LList [LAtom "hello", LAtom "world"]]
+          runParser "``hello" `shouldBe` LList [LAtom "quote", LList [LAtom "quote", LAtom "hello"]]
+
+      describe "parseDotted" $ do
+        it "works on a simple list" $ do
+          runParser "(5 . 3)" `shouldBe` LDottedList [LInteger 5, LInteger 3]
