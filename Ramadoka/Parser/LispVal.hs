@@ -36,8 +36,12 @@ module Ramadoka.Parser.LispVal
     show (LFailure a) = "LFailure" ++ a
 
   normalizeRational :: Integer -> Integer -> LispVal
-  normalizeRational a b = LRational (a `div` divisor) (b `div` divisor)
-    where divisor = gcd a b
+  normalizeRational dividend divisor
+    | normalDivisor == 1 = LInteger normalDividend
+    | otherwise = LRational normalDividend normalDivisor
+    where normalizer = gcd dividend divisor
+          normalDividend = dividend `div` normalizer
+          normalDivisor = divisor `div` normalizer
 
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = "No Match: " ++ show err
@@ -190,6 +194,7 @@ module Ramadoka.Parser.LispVal
   numericBinop :: LispVal -> (LispVal -> LispVal -> LispVal)
   numericBinop (LAtom "+") = lAdd
   numericBinop (LAtom "-") = lSub
+  numericBinop (LAtom "*") = lMul
 
   lAdd :: LispVal -> LispVal -> LispVal
   lAdd (LInteger i1) (LInteger i2) = LInteger (i1 + i2)

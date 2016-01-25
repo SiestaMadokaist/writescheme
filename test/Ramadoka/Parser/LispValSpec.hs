@@ -20,7 +20,7 @@ module Ramadoka.Parser.SchemerSpec where
     describe "eval" $ do
       let fGT (LFloat f1) (LFloat f2) = f1 > f2
       let fLT (LFloat f1) (LFloat f2) = f1 < f2
-      describe "numeric evaluation" $ do
+      describe "addition" $ do
         it "works on multiple values" $ do
           runEval "(+ 5 3 2)" `shouldBe` LInteger 10
         it "works on addition between integer and integer" $ do
@@ -33,10 +33,12 @@ module Ramadoka.Parser.SchemerSpec where
           runEval queryString `shouldNotSatisfy` (`fGT` LFloat 8.3)
         it "works on addition between rational and rational" $ do
           runEval "(+ #e3.2 #e3.2)" `shouldBe` runEval "#e6.4"
+        it "automatically convert to integer if its exact value is integer" $ do
+          runEval "(+ #e1.5 #e1.5)" `shouldBe` LInteger 3
         it "works on addition between rational and float" $ do
           let result = runEval "(+ #e2.6 #i1.3)"
-              -- specifically choosen number which addition doesn't equal
-              -- to its exact value
+          -- specifically chosen floating point of which its addition doesn't equal
+          -- to its exact value
           result `shouldNotBe` runEval "#i3.9"
           result `shouldSatisfy` (`fGT` LFloat 3.89)
           result `shouldSatisfy` (`fLT` LFloat 3.91)
@@ -45,17 +47,45 @@ module Ramadoka.Parser.SchemerSpec where
           result `shouldNotBe` runEval "#i3.9"
           result `shouldSatisfy` (`fGT` LFloat 3.89)
           result `shouldSatisfy` (`fLT` LFloat 3.91)
+
+      describe "substraction" $ do
+        it "works on a single values" $ do
+          runEval "(- 5)" `shouldBe` LInteger 5
+        it "works on multiple values" $ do
+          runEval "(- 5 3 1)" `shouldBe` LInteger 1
         it "works on substraction between integer and integer" $ do
-          runEval "(- 5 3)" `shouldBe` runEval "#e2"
+          runEval "(- 5 3)" `shouldBe` LInteger 2
         it "works on substraction between integer and rational" $ do
           runEval "(- 5 #e3.2)" `shouldBe` runEval "#e1.8"
           runEval "(- 5 #e1.2 #e1.2)" `shouldBe` runEval "#e2.6"
+
+      describe "multiplication" $ do
+        it "works on simple example" $ do
+          runEval "(* 5 3)" `shouldBe` LInteger 15
+        it "works on multiple values" $ do
+          runEval "(* 5 3 2)" `shouldBe` LInteger 30
+        it "works between integer and rational" $ do
+          runEval "(* 2 #e1.5)" `shouldBe` LInteger 3
+        it "works between integer and float" $ do
+          let result = runEval "(* 2 #i1.5)"
+          result `shouldSatisfy` (`fGT` LFloat 2.99)
+          result `shouldSatisfy` (`fLT` LFloat 3.01)
+        it "works between rational and rational" $ do
+          runEval "(* #e0.5 #e6.4)" `shouldBe` runEval "#e3.2"
+        it "works between rational and float" $ do
+          let result = runEval "(* #e0.5 #i2)"
+          result `shouldSatisfy` (`fGT` LFloat 0.99)
+          result `shouldSatisfy` (`fLT` LFloat 1.01)
+        it "works between float and float" $ do
+          let result = runEval "(* #i0.5 #i2)"
+          result `shouldSatisfy` (`fGT` LFloat 0.99)
+          result `shouldSatisfy` (`fLT` LFloat 1.01)
 
     describe "normalizeRational" $ do
       it "is correct" $ do
         normalizeRational 12 10 `shouldBe` LRational 6 5
       it "is correct" $ do
-        normalizeRational 1200 10 `shouldBe` LRational 120 1
+        normalizeRational 1200 10 `shouldBe` LInteger 120
 
     describe "getExpr" $ do
       describe "parseString" $ do
