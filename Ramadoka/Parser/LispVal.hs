@@ -186,6 +186,7 @@ module Ramadoka.Parser.LispVal
   eval val@(LFloat _) = val
   eval val@(LRational _ _) = val
   eval val@(LString _) = val
+  eval (LList [LAtom "quote", expr]) = expr
   eval (LList exprs) = listEval exprs
 
   listEval :: [LispVal] -> LispVal
@@ -195,6 +196,28 @@ module Ramadoka.Parser.LispVal
   numericBinop (LAtom "+") = lAdd
   numericBinop (LAtom "-") = lSub
   numericBinop (LAtom "*") = lMul
+  numericBinop (LAtom "/") = lDiv
+
+  lDiv :: LispVal -> LispVal -> LispVal
+  -- integer division
+  lDiv i1@(LInteger _) i2@(LInteger _) = lDiv (intToRational i1) (intToRational i2)
+  lDiv i@(LInteger _) (LRational dividend divisor) = lMul i (LRational divisor dividend)
+  lDiv (LInteger i) (LFloat f) = LFloat $ (fromIntegral i) / f
+  -- rational division
+  lDiv r@(LRational _ _) i@(LInteger _) = lDiv r (intToRational i)
+  lDiv r@(LRational _  _) (LRational dividend divisor) = lMul r (LRational divisor dividend)
+  lDiv (LRational dividend divisor) (LFloat f) = LFloat $ finalDividend / finalDivisor
+    where floatDividend = fromIntegral dividend
+          floatDivisor = fromIntegral divisor
+          finalDividend = floatDividend / floatDivisor
+          finalDivisor = f
+  -- float division
+  lDiv (LFloat f) (LInteger i) = LFloat (f / (fromIntegral i))
+  lDiv f@(LFloat _) (LRational dividend divisor) = lMul f (LRational divisor dividend)
+  lDiv (LFloat f1) (LFloat f2) = LFloat (f1 / f2)
+
+  intToRational :: LispVal -> LispVal
+  intToRational (LInteger i) = LRational i 1
 
   lAdd :: LispVal -> LispVal -> LispVal
   lAdd (LInteger i1) (LInteger i2) = LInteger (i1 + i2)
@@ -230,7 +253,7 @@ module Ramadoka.Parser.LispVal
       a = fromIntegral dividend
       b = fromIntegral divisor
   lMul f@(LFloat _) i@(LInteger _) = lMul i f
-  lMul f@(LFloat _) r@(LRational _ _) = lMul f r
+  lMul f@(LFloat _) r@(LRational _ _) = lMul r f
   lMul (LFloat f1) (LFloat f2) = LFloat $ f1 * f2
 
   lSub :: LispVal -> LispVal -> LispVal
