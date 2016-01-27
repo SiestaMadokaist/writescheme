@@ -200,12 +200,10 @@ module Ramadoka.Parser.LispVal
 
   lDiv :: LispVal -> LispVal -> LispVal
   -- integer division
-  lDiv i1@(LInteger _) i2@(LInteger _) = lDiv (intToRational i1) (intToRational i2)
-  lDiv i@(LInteger _) (LRational dividend divisor) = lMul i (LRational divisor dividend)
+  lDiv (LInteger dividend) (LInteger divisor) = normalizeRational dividend divisor
   lDiv (LInteger i) (LFloat f) = LFloat $ (fromIntegral i) / f
   -- rational division
   lDiv r@(LRational _ _) i@(LInteger _) = lDiv r (intToRational i)
-  lDiv r@(LRational _  _) (LRational dividend divisor) = lMul r (LRational divisor dividend)
   lDiv (LRational dividend divisor) (LFloat f) = LFloat $ finalDividend / finalDivisor
     where floatDividend = fromIntegral dividend
           floatDivisor = fromIntegral divisor
@@ -213,8 +211,11 @@ module Ramadoka.Parser.LispVal
           finalDivisor = f
   -- float division
   lDiv (LFloat f) (LInteger i) = LFloat (f / (fromIntegral i))
-  lDiv f@(LFloat _) (LRational dividend divisor) = lMul f (LRational divisor dividend)
   lDiv (LFloat f1) (LFloat f2) = LFloat (f1 / f2)
+  lDiv n (LRational dividend divisor) = lMul n (LRational divisor dividend)
+  lDiv var1@(LList _) var2@(LList _) = lDiv (eval var1) (eval var2)
+  lDiv var1@(LList _) var2 = lDiv (eval var1) var2
+  lDiv var1 var2@(LList _) = lDiv var1 (eval var2)
 
   intToRational :: LispVal -> LispVal
   intToRational (LInteger i) = LRational i 1
@@ -233,6 +234,9 @@ module Ramadoka.Parser.LispVal
   lAdd f@(LFloat _) i@(LInteger _) = lAdd i f
   lAdd f@(LFloat _) r@(LRational _ _) = lAdd r f
   lAdd (LFloat f1) (LFloat f2) = LFloat (f1 + f2)
+  lAdd var1@(LList _) var2@(LList _) = lAdd (eval var1) (eval var2)
+  lAdd var1@(LList _) var2 = lAdd (eval var1) var2
+  lAdd var1 var2@(LList _) = lAdd var1 (eval var2)
 
   lRationalAdd :: LispVal -> LispVal -> LispVal
   lRationalAdd (LRational dividend1 divisor1) (LRational dividend2 divisor2) = normalizeRational dividendResult divisorResult
@@ -255,6 +259,9 @@ module Ramadoka.Parser.LispVal
   lMul f@(LFloat _) i@(LInteger _) = lMul i f
   lMul f@(LFloat _) r@(LRational _ _) = lMul r f
   lMul (LFloat f1) (LFloat f2) = LFloat $ f1 * f2
+  lMul var1@(LList _) var2@(LList _) = lMul (eval var1) (eval var2)
+  lMul var1@(LList _) var2 = lMul (eval var1) var2
+  lMul var1 var2@(LList _) = lMul var1 (eval var2)
 
   lSub :: LispVal -> LispVal -> LispVal
   lSub a b = lAdd a $ lMul b (LInteger (-1))

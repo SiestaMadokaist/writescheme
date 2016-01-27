@@ -105,6 +105,13 @@ module Ramadoka.Parser.SchemerSpec where
           result `shouldSatisfy` (`fGT` LFloat 4.33)
           result `shouldSatisfy` (`fLT` LFloat 4.34)
 
+      describe "nested expression" $ do
+        it "works on nested expression (2 level)" $ do
+          runEval "(+ 5 (/ 5 2))" `shouldBe` LRational 15 2
+          runEval "(+ 5 (- 5 3 1) 2)" `shouldBe` LInteger 8
+        it "works on nested expression (3 level)" $ do
+          runEval "(+ 5 (- (/ 5 2) 2) 2)" `shouldBe` LRational 15 2
+
     describe "normalizeRational" $ do
       it "is correct" $ do
         normalizeRational 12 10 `shouldBe` LRational 6 5
