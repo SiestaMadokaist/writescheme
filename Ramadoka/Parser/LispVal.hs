@@ -15,7 +15,7 @@ module Ramadoka.Parser.LispVal
 
   data LispVal = LInteger Integer
     | LFloat Float
-    | LRational {dividend :: Integer, divisor :: Integer}
+    | LRational {numerator :: Integer, denominator :: Integer}
     | LBool Bool
     | LAtom String
     | LChar Char
@@ -36,12 +36,12 @@ module Ramadoka.Parser.LispVal
     show (LFailure a) = "LFailure" ++ a
 
   normalizeRational :: Integer -> Integer -> LispVal
-  normalizeRational dividend divisor
+  normalizeRational numerator denominator
     | normalDivisor == 1 = LInteger normalDividend
     | otherwise = LRational normalDividend normalDivisor
-    where normalizer = gcd dividend divisor
-          normalDividend = dividend `div` normalizer
-          normalDivisor = divisor `div` normalizer
+    where normalizer = gcd numerator denominator
+          normalDividend = numerator `div` normalizer
+          normalDivisor = denominator `div` normalizer
 
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = "No Match: " ++ show err
@@ -95,29 +95,42 @@ module Ramadoka.Parser.LispVal
   parseNumber :: Parser LispVal
   parseNumber = do
     xs <- many1 digit
-    let characteristic = read xs :: Integer
-    (parseFloat characteristic) <|> (parseIntPower characteristic) <|> (return $ LInteger characteristic)
+    let currentNumber = read xs :: Integer
+        -- our current number is probably a:
+        -- base for a power
+        -- characteristic of
+        base = currentNumber
+        numerator = currentNumber
+        characteristic = currentNumber
+    (parseRational numerator) <|> (parseFloat characteristic) <|> (parseIntPower base) <|> (return $ LInteger characteristic)
 
   parseExactPoweredFloat :: Integer -> Integer -> Parser LispVal
-  parseExactPoweredFloat dividend divisor = do
+  parseExactPoweredFloat numerator denominator = do
     xs <- digitsDirectlyAfter 'e'
     let exponent = read xs :: Integer
-    return $ normalizeRational (dividend * 10 ^ exponent) (divisor)
+    return $ normalizeRational (numerator * 10 ^ exponent) (denominator)
 
   parseExactFloat :: Integer -> Parser LispVal
   parseExactFloat characteristic = do
     xs <- digitsDirectlyAfter '.'
     let mantissa = read xs :: Integer
         exponent = length xs
-        divisor = 10 ^ exponent
-        dividend = ((characteristic * divisor) + mantissa)
-    (parseExactPoweredFloat dividend divisor) <|> (return $ normalizeRational dividend divisor)
+        denominator = 10 ^ exponent
+        numerator = ((characteristic * denominator) + mantissa)
+    (parseExactPoweredFloat numerator denominator) <|> (return $ normalizeRational numerator denominator)
+
+  parseRational :: Integer -> Parser LispVal
+  parseRational numerator = do
+    xs <- digitsDirectlyAfter '/'
+    let denominator = read xs :: Integer
+    return $ normalizeRational numerator denominator
 
   parseExactNumber :: Parser LispVal
   parseExactNumber = do
     xs <- digitsDirectlyAfter 'e'
     let characteristic = read xs :: Integer
-    (parseIntPower characteristic) <|> (parseExactFloat characteristic) <|> (return $ LInteger characteristic)
+        numerator = characteristic
+    (parseRational numerator) <|> (parseIntPower characteristic) <|> (parseExactFloat characteristic) <|> (return $ LInteger characteristic)
 
   parseInexactNumber :: Parser LispVal
   parseInexactNumber = do
@@ -200,19 +213,19 @@ module Ramadoka.Parser.LispVal
 
   lDiv :: LispVal -> LispVal -> LispVal
   -- integer division
-  lDiv (LInteger dividend) (LInteger divisor) = normalizeRational dividend divisor
+  lDiv (LInteger numerator) (LInteger denominator) = normalizeRational numerator denominator
   lDiv (LInteger i) (LFloat f) = LFloat $ (fromIntegral i) / f
   -- rational division
   lDiv r@(LRational _ _) i@(LInteger _) = lDiv r (intToRational i)
-  lDiv (LRational dividend divisor) (LFloat f) = LFloat $ finalDividend / finalDivisor
-    where floatDividend = fromIntegral dividend
-          floatDivisor = fromIntegral divisor
+  lDiv (LRational numerator denominator) (LFloat f) = LFloat $ finalDividend / finalDivisor
+    where floatDividend = fromIntegral numerator
+          floatDivisor = fromIntegral denominator
           finalDividend = floatDividend / floatDivisor
           finalDivisor = f
   -- float division
   lDiv (LFloat f) (LInteger i) = LFloat (f / (fromIntegral i))
   lDiv (LFloat f1) (LFloat f2) = LFloat (f1 / f2)
-  lDiv n (LRational dividend divisor) = lMul n (LRational divisor dividend)
+  lDiv n (LRational numerator denominator) = lMul n (LRational denominator numerator)
   lDiv var1@(LList _) var2@(LList _) = lDiv (eval var1) (eval var2)
   lDiv var1@(LList _) var2 = lDiv (eval var1) var2
   lDiv var1 var2@(LList _) = lDiv var1 (eval var2)
@@ -226,10 +239,10 @@ module Ramadoka.Parser.LispVal
   lAdd (LInteger i) (LFloat f) = (LFloat $ (fromIntegral i) + f)
   lAdd r1@(LRational _ _) r2@(LRational _ _) = lRationalAdd r1 r2
   lAdd r@(LRational _ _) i@(LInteger _) = lAdd i r
-  lAdd (LRational dividend divisor) (LFloat f) = LFloat $ fr + f
+  lAdd (LRational numerator denominator) (LFloat f) = LFloat $ fr + f
     where
-      a = fromIntegral dividend
-      b = fromIntegral divisor
+      a = fromIntegral numerator
+      b = fromIntegral denominator
       fr = a / b
   lAdd f@(LFloat _) i@(LInteger _) = lAdd i f
   lAdd f@(LFloat _) r@(LRational _ _) = lAdd r f
@@ -239,23 +252,23 @@ module Ramadoka.Parser.LispVal
   lAdd var1 var2@(LList _) = lAdd var1 (eval var2)
 
   lRationalAdd :: LispVal -> LispVal -> LispVal
-  lRationalAdd (LRational dividend1 divisor1) (LRational dividend2 divisor2) = normalizeRational dividendResult divisorResult
-    where normal1 = LRational (dividend1 * divisor2) (divisor1 * divisor2)
-          normal2 = LRational (dividend2 * divisor1) (divisor1 * divisor2)
-          dividendResult = (dividend normal1) + (dividend normal2)
-          divisorResult = (divisor1 * divisor2)
+  lRationalAdd (LRational numerator1 denominator1) (LRational numerator2 denominator2) = normalizeRational numeratorResult denominatorResult
+    where normal1 = LRational (numerator1 * denominator2) (denominator1 * denominator2)
+          normal2 = LRational (numerator2 * denominator1) (denominator1 * denominator2)
+          numeratorResult = (numerator normal1) + (numerator normal2)
+          denominatorResult = (denominator1 * denominator2)
 
   lMul :: LispVal -> LispVal -> LispVal
   lMul (LInteger i1) (LInteger i2) = LInteger (i1 * i2)
-  lMul (LInteger i) (LRational dividend divisor) = normalizeRational (i * dividend) divisor
+  lMul (LInteger i) (LRational numerator denominator) = normalizeRational (i * numerator) denominator
   lMul (LInteger i) (LFloat f) = LFloat $ (fromIntegral i) * f
   lMul r@(LRational _ _) i@(LInteger _) = lMul i r
-  lMul (LRational dividend1 divisor1) (LRational dividend2 divisor2) = normalizeRational (dividend1 * dividend2) (divisor1 * divisor2)
-  lMul (LRational dividend divisor) (LFloat f) = (LFloat $ fr * f)
+  lMul (LRational numerator1 denominator1) (LRational numerator2 denominator2) = normalizeRational (numerator1 * numerator2) (denominator1 * denominator2)
+  lMul (LRational numerator denominator) (LFloat f) = (LFloat $ fr * f)
     where
       fr = a / b
-      a = fromIntegral dividend
-      b = fromIntegral divisor
+      a = fromIntegral numerator
+      b = fromIntegral denominator
   lMul f@(LFloat _) i@(LInteger _) = lMul i f
   lMul f@(LFloat _) r@(LRational _ _) = lMul r f
   lMul (LFloat f1) (LFloat f2) = LFloat $ f1 * f2
