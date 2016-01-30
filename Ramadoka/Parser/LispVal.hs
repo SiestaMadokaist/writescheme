@@ -32,8 +32,11 @@ module Ramadoka.Parser.LispVal
     show (LChar a) = show a
     show (LAtom a) = a
     show (LString a) = a
-    show (LList xs) = "(" ++ ((intercalate ", ") . (map show)) xs ++ ")"
+    show (LList xs) = stringify xs
     show (LFailure a) = "LFailure" ++ a
+
+  stringify :: [LispVal] -> String
+  stringify xs = ((intercalate ", ") . (map show)) xs
 
   normalizeRational :: Integer -> Integer -> LispVal
   normalizeRational numerator denominator
@@ -203,13 +206,36 @@ module Ramadoka.Parser.LispVal
   eval (LList exprs) = listEval exprs
 
   listEval :: [LispVal] -> LispVal
-  listEval (func : head : tails) = foldl (numericBinop func) head tails
+  listEval (func : head : []) = (unOp func) head
+  listEval (func : head : tails) = foldl (binOp func) head tails
 
-  numericBinop :: LispVal -> (LispVal -> LispVal -> LispVal)
-  numericBinop (LAtom "+") = lAdd
-  numericBinop (LAtom "-") = lSub
-  numericBinop (LAtom "*") = lMul
-  numericBinop (LAtom "/") = lDiv
+  isSymbol :: LispVal -> LispVal
+  isSymbol (LAtom _) = LBool True
+  isSymbol (LList exprs) = isSymbol $ listEval exprs
+  isSymbol _ = LBool False
+
+  isString :: LispVal -> LispVal
+  isString (LString _) = LBool True
+  isString (LList exprs) = isString $ listEval exprs
+  isString _ = LBool False
+
+  isNumber :: LispVal -> LispVal
+  isNumber (LRational _ _) = LBool True
+  isNumber (LInteger _) = LBool True
+  isNumber (LFloat _)  = LBool True
+  isNumber (LList exprs) = isNumber $ listEval exprs
+  isNumber _ = LBool False
+
+  unOp :: LispVal -> (LispVal -> LispVal)
+  unOp (LAtom "symbol?") = isSymbol
+  unOp (LAtom "string?") = isString
+  unOp (LAtom "number?") = isNumber
+
+  binOp :: LispVal -> (LispVal -> LispVal -> LispVal)
+  binOp (LAtom "+") = lAdd
+  binOp (LAtom "-") = lSub
+  binOp (LAtom "*") = lMul
+  binOp (LAtom "/") = lDiv
 
   lDiv :: LispVal -> LispVal -> LispVal
   -- integer division

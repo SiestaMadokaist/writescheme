@@ -20,6 +20,28 @@ module Ramadoka.Parser.SchemerSpec where
     describe "eval" $ do
       let fGT (LFloat f1) (LFloat f2) = f1 > f2
       let fLT (LFloat f1) (LFloat f2) = f1 < f2
+
+      describe "symbol?" $ do
+        it "return true for type symbol" $ do
+          runEval "(symbol? hello)" `shouldBe` LBool True
+        it "return false otherwise" $ do
+          runEval "(symbol? 5)" `shouldBe` LBool False
+
+      describe "number?" $ do
+        it "return true for number" $ do
+          runEval "(number? 5)" `shouldBe` LBool True
+          runEval "(number? (/ 5  3))" `shouldBe` LBool True
+          runEval "(number? (+ 1 #i0.7))" `shouldBe` LBool True
+
+        it "return false otherwise" $ do
+          runEval "(number? Atom)" `shouldBe` LBool False
+
+      describe "string?" $ do
+        it "return true for string" $ do
+          runEval "(string? \"test\")" `shouldBe` LBool True
+        it "return false otherwise" $ do
+          runEval "(string? hello)" `shouldBe` LBool False
+
       describe "addition" $ do
         it "parse multiple values" $ do
           runEval "(+ 5 3 2)" `shouldBe` LInteger 10
@@ -49,8 +71,6 @@ module Ramadoka.Parser.SchemerSpec where
           result `shouldSatisfy` (`fLT` LFloat 3.91)
 
       describe "substraction" $ do
-        it "parse a single values" $ do
-          runEval "(- 5)" `shouldBe` LInteger 5
         it "parse multiple values" $ do
           runEval "(- 5 3 1)" `shouldBe` LInteger 1
         it "parse substraction between integer and integer" $ do
