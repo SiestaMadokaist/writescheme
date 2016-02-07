@@ -29,6 +29,8 @@ module Ramadoka.Parser.LispVal
     show (LInteger a) = show a
     show (LFloat a) = show a
     show (LRational a b) = (show a) ++ "/" ++ (show b)
+    show (LBool True) = "#t"
+    show (LBool False) = "#f"
     show (LChar a) = show a
     show (LAtom a) = a
     show (LString a) = a
@@ -49,6 +51,8 @@ module Ramadoka.Parser.LispVal
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = "No Match: " ++ show err
   errPrint (Right val) = "Found Value: " ++ show val
+
+  test = 5
 
   escapeCharacters :: Parser Char
   escapeCharacters = do
@@ -195,7 +199,6 @@ module Ramadoka.Parser.LispVal
   parseExpr = parseSymbolic <|> (parseFloat 0) <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> (try parseList) <|> (try parseDottedList)
 
   -- end of parser --
-
   eval :: LispVal -> LispVal
   eval val@(LBool _) = val
   eval val@(LInteger _) = val
@@ -204,10 +207,31 @@ module Ramadoka.Parser.LispVal
   eval val@(LString _) = val
   eval (LList [LAtom "quote", expr]) = expr
   eval (LList exprs) = listEval exprs
+  eval x = LFailure $ show x
 
   listEval :: [LispVal] -> LispVal
-  listEval (func : head : []) = (unOp func) head
-  listEval (func : head : tails) = foldl (binOp func) head tails
+  listEval (LAtom func : args) = apply func $ map eval args
+  -- listEval (LAtom func : head : tails) = foldl (binOp func) head tails
+
+  apply :: String -> [LispVal] -> LispVal
+  apply func args = maybe (LBool False) ($ args) (lookup func primitives)
+
+  primitives :: [(String, [LispVal] -> LispVal)]
+  primitives = [
+               ("+", binOp "+"),
+               ("-", binOp "-"),
+               ("*", binOp "*"),
+               ("/", binOp "/"),
+               ("symbol?", isSymbol . head),
+               ("string?", isString . head),
+               ("number?", isNumber . head)
+               ]
+
+  binOp :: String -> [LispVal] -> LispVal
+  binOp "+" (x:xs) = foldl lAdd x xs
+  binOp "-" (x:xs) = foldl lSub x xs
+  binOp "*" (x:xs) = foldl lMul x xs
+  binOp "/" (x:xs) = foldl lDiv x xs
 
   isSymbol :: LispVal -> LispVal
   isSymbol (LAtom _) = LBool True
@@ -225,17 +249,6 @@ module Ramadoka.Parser.LispVal
   isNumber (LFloat _)  = LBool True
   isNumber (LList exprs) = isNumber $ listEval exprs
   isNumber _ = LBool False
-
-  unOp :: LispVal -> (LispVal -> LispVal)
-  unOp (LAtom "symbol?") = isSymbol
-  unOp (LAtom "string?") = isString
-  unOp (LAtom "number?") = isNumber
-
-  binOp :: LispVal -> (LispVal -> LispVal -> LispVal)
-  binOp (LAtom "+") = lAdd
-  binOp (LAtom "-") = lSub
-  binOp (LAtom "*") = lMul
-  binOp (LAtom "/") = lDiv
 
   lDiv :: LispVal -> LispVal -> LispVal
   -- integer division
