@@ -5,6 +5,7 @@ module Ramadoka.Parser.LispVal
   getExpr,
   normalizeRational,
   LispVal(..),
+  Number(..),
   eval,
 ) where
   import Ramadoka.Parser.Number
@@ -28,7 +29,7 @@ module Ramadoka.Parser.LispVal
     show (Bool True) = "#t"
     show (Bool False) = "#f"
     show (Char c) = show c
-    show (String s) = show s
+    show (String s) = [i|`#{s}`|]
     show (List l) = [i|(#{stringify l})|]
     show (DottedList l) = [i|Dotted (#{stringify l})|]
     show (Number n) = show n
