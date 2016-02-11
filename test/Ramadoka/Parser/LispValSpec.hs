@@ -15,13 +15,39 @@ module Ramadoka.Parser.SchemerSpec where
   runEval :: String -> LispVal
   runEval input = eval $ runParser input
 
+  int :: Integer -> LispVal
+  int x = Number $ Integer x
+
+  flt :: Float -> LispVal
+  flt x = Number $ Float x
+
+  ratio :: Integer -> Integer -> LispVal
+  ratio a b = Number $ Rational a b
+
   spec :: Spec
   spec = do
+
+    describe "evaluation" $ do
+      describe "addition" $ do
+        it "works between 2 integer" $ do
+          runEval "(+ 2 2)" `shouldBe` int 4
+        it "works between 2 rational" $ do
+          runEval "(+ 2/5 1/5)" `shouldBe` ratio 3 5
+        it "works between integer and rational" $ do
+          runEval "(+ 3/5 1 2/5)" `shouldBe` int 2
+      describe "multiplication" $ do
+        it "works between 2 integer" $ do
+          runEval "(* 3 2)" `shouldBe` int 6
+        it "works between 2 rational" $ do
+          runEval "(* 1/5 3/5)" `shouldBe` ratio 3 25
+
     describe "normalizeRational" $ do
       it "does correctly on trivial integer-like rational" $ do
         normalizeRational 3 1 `shouldBe` Integer 3
-      it "does it correctly" $ do
+      it "does trivial rational correctly" $ do
         normalizeRational 3 5 `shouldBe` Rational 3 5
+      it "use gcd correctly" $ do
+        normalizeRational 24 32 `shouldBe` Rational 3 4
 
     describe "getExpr" $ do
       describe "parseString" $ do

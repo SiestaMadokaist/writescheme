@@ -34,6 +34,7 @@ module Ramadoka.Parser.LispVal
     show (DottedList l) = [i|Dotted (#{stringify l})|]
     show (Number n) = show n
     show (Atom s) = [i|Atom #{s}|]
+    show (Failure s) = [i|Failure #{s}|]
 
   stringify :: [LispVal] -> String
   stringify xs = ((intercalate ", ") . (map show)) xs
@@ -185,8 +186,22 @@ module Ramadoka.Parser.LispVal
   eval val@(Number _) = val
   eval val@(String _) = val
   eval (List [Atom "quote", expr]) = expr
-  -- eval (List exprs) = listEval exprs
+  eval (List (Atom func : exprs)) = apply func $ map eval exprs
   eval x = Failure $ show x
+
+  apply :: String -> [LispVal] -> LispVal
+  apply "+" = levitate (|+|)
+  apply "-" = levitate (|-|)
+  apply "*" = levitate (|*|)
+  apply "/" = levitate (|/|)
+
+  levitate :: (Number -> Number -> Number) -> [LispVal] -> LispVal
+  levitate op args = Number $ foldl1 op $ map unpackNum args
+
+  unpackNum :: LispVal -> Number
+  unpackNum (Number r@(Rational _ _)) = r
+  unpackNum (Number i@(Integer _)) = i
+  unpackNum (Number f@(Float _)) = f
 
   getExpr :: String -> Either ParseError LispVal
   getExpr = parse parseExpr "lisp"
