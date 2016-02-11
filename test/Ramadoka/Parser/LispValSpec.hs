@@ -28,6 +28,34 @@ module Ramadoka.Parser.SchemerSpec where
   spec = do
 
     describe "evaluation" $ do
+      describe "unOp" $ do
+        describe "symbol?" $ do
+          it "return false on quoted empty list" $ do
+            runEval "(symbol? `())" `shouldBe` Bool False
+          it "return true on quoted value" $ do
+            runEval "(symbol? `hello)" `shouldBe` Bool True
+          it "return true on quoted expression" $ do
+            runEval "(symbol? `(+ 5 3))" `shouldBe` Bool True
+          it "return false on expressionns" $ do
+            runEval "(symbol? (+ 5 3))" `shouldBe` Bool False
+          it "return true on quoted number" $ do
+            runEval "(symbol? `5)" `shouldBe` Bool True
+          it "return false on number" $ do
+            runEval "(symbol? 5)" `shouldBe` Bool False
+
+        describe "string?" $ do
+          it "return false on number" $ do
+            runEval "(string? 3)" `shouldBe` Bool False
+          it "return true on string" $ do
+            runEval "(string? \"hello\")" `shouldBe` Bool True
+        describe "number?" $ do
+          it "return false on atom" $ do
+            runEval "(number? hello)" `shouldBe` Bool False
+          it "return true on number" $ do
+            runEval "(number? 2/5)" `shouldBe` Bool True
+          it "return true on expression that evaluate to number" $ do
+            runEval "(number? (+ 2/5 3/5))" `shouldBe` Bool True
+
       describe "addition" $ do
         it "works between 2 integer" $ do
           runEval "(+ 2 2)" `shouldBe` int 4

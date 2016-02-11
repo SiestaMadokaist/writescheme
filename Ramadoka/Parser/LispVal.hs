@@ -194,6 +194,21 @@ module Ramadoka.Parser.LispVal
   apply "-" = levitate (|-|)
   apply "*" = levitate (|*|)
   apply "/" = levitate (|/|)
+  apply "string?" = isString . head
+  apply "number?" = isNumber . head
+  apply "symbol?" = isSymbol . head
+
+  isSymbol :: LispVal -> LispVal
+  isSymbol (Atom _) = Bool True
+  isSymbol x = x
+
+  isString :: LispVal -> LispVal
+  isString (String _) = Bool True
+  isString _ = Bool False
+
+  isNumber :: LispVal -> LispVal
+  isNumber (Number _) = Bool True
+  isNumber _ = Bool False
 
   levitate :: (Number -> Number -> Number) -> [LispVal] -> LispVal
   levitate op args = Number $ foldl1 op $ map unpackNum args
