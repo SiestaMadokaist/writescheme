@@ -35,11 +35,11 @@ module Ramadoka.Parser.SchemerSpec where
           it "return true on quoted value" $ do
             runEval "(symbol? `hello)" `shouldBe` Bool True
           it "return true on quoted expression" $ do
-            runEval "(symbol? `(+ 5 3))" `shouldBe` Bool True
+            runEval "(symbol? `(+ 5 3))" `shouldBe` Bool False
           it "return false on expressionns" $ do
             runEval "(symbol? (+ 5 3))" `shouldBe` Bool False
           it "return true on quoted number" $ do
-            runEval "(symbol? `5)" `shouldBe` Bool True
+            runEval "(symbol? `5)" `shouldBe` Bool False
           it "return false on number" $ do
             runEval "(symbol? 5)" `shouldBe` Bool False
 
@@ -56,26 +56,27 @@ module Ramadoka.Parser.SchemerSpec where
           it "return true on expression that evaluate to number" $ do
             runEval "(number? (+ 2/5 3/5))" `shouldBe` Bool True
 
-      describe "addition" $ do
-        it "works between 2 integer" $ do
-          runEval "(+ 2 2)" `shouldBe` int 4
-        it "works between 2 rational" $ do
-          runEval "(+ 2/5 1/5)" `shouldBe` ratio 3 5
-        it "works between integer and rational" $ do
-          runEval "(+ 3/5 1 2/5)" `shouldBe` int 2
-      describe "multiplication" $ do
-        it "works between 2 integer" $ do
-          runEval "(* 3 2)" `shouldBe` int 6
-        it "works between 2 rational" $ do
-          runEval "(* 1/5 3/5)" `shouldBe` ratio 3 25
+      describe "binOp" $ do
+        describe "addition" $ do
+          it "works between 2 integer" $ do
+            runEval "(+ 2 2)" `shouldBe` int 4
+          it "works between 2 rational" $ do
+            runEval "(+ 2/5 1/5)" `shouldBe` ratio 3 5
+          it "works between integer and rational" $ do
+            runEval "(+ 3/5 1 2/5)" `shouldBe` int 2
+        describe "multiplication" $ do
+          it "works between 2 integer" $ do
+            runEval "(* 3 2)" `shouldBe` int 6
+          it "works between 2 rational" $ do
+            runEval "(* 1/5 3/5)" `shouldBe` ratio 3 25
 
-    describe "normalizeRational" $ do
-      it "does correctly on trivial integer-like rational" $ do
-        normalizeRational 3 1 `shouldBe` Integer 3
-      it "does trivial rational correctly" $ do
-        normalizeRational 3 5 `shouldBe` Rational 3 5
-      it "use gcd correctly" $ do
-        normalizeRational 24 32 `shouldBe` Rational 3 4
+      describe "normalizeRational" $ do
+        it "does correctly on trivial integer-like rational" $ do
+          normalizeRational 3 1 `shouldBe` Integer 3
+        it "does trivial rational correctly" $ do
+          normalizeRational 3 5 `shouldBe` Rational 3 5
+        it "use gcd correctly" $ do
+          normalizeRational 24 32 `shouldBe` Rational 3 4
 
     describe "getExpr" $ do
       describe "parseString" $ do

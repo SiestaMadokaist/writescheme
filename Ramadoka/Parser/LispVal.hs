@@ -200,7 +200,7 @@ module Ramadoka.Parser.LispVal
 
   isSymbol :: LispVal -> LispVal
   isSymbol (Atom _) = Bool True
-  isSymbol x = x
+  isSymbol _ = Bool False
 
   isString :: LispVal -> LispVal
   isString (String _) = Bool True
