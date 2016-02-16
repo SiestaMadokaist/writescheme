@@ -8,12 +8,14 @@ module Ramadoka.Parser.SchemerSpec where
   -- method to easify testing
   -- how do I handle error here anyway?
   runParser :: String -> LispVal
-  runParser input = case getExpr input of
-                     (Right val) -> val
-                     (Left err) -> Failure (show err)
+  runParser input = unpackLispVal $ getExpr input
+
+  unpackLispVal :: ThrowsError LispVal -> LispVal
+  unpackLispVal (Right val) = val
+  unpackLispVal (Left err) = Failure err
 
   runEval :: String -> LispVal
-  runEval input = eval $ runParser input
+  runEval input = unpackLispVal $ eval $ runParser input
 
   int :: Integer -> LispVal
   int x = Number $ Integer x
@@ -50,7 +52,7 @@ module Ramadoka.Parser.SchemerSpec where
             runEval "(string? \"hello\")" `shouldBe` Bool True
         describe "number?" $ do
           it "return false on atom" $ do
-            runEval "(number? hello)" `shouldBe` Bool False
+            runEval "(number? `hello)" `shouldBe` Bool False
           it "return true on number" $ do
             runEval "(number? 2/5)" `shouldBe` Bool True
           it "return true on expression that evaluate to number" $ do

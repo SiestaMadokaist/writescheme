@@ -5,4 +5,4 @@ echo ""
 echo ""
 echo ""
 echo ""
-runhaskell test/Ramadoka/Parser/LispValSpec.hs
+runhaskell -w test/Ramadoka/Parser/LispValSpec.hs
