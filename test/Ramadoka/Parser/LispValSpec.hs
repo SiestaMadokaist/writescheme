@@ -69,6 +69,10 @@ module Ramadoka.Parser.SchemerSpec where
             runEval "(* 3 2)" `shouldBe` int 6
           it "works between 2 rational" $ do
             runEval "(* 1/5 3/5)" `shouldBe` ratio 3 25
+        describe "multiple evaluation" $ do
+          it "works on nested expression" $ do
+            runEval "(* 2 (+ 3 5))" `shouldBe` int 16
+
 
       describe "normalizeRational" $ do
         it "does correctly on trivial integer-like rational" $ do

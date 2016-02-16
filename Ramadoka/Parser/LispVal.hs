@@ -1,19 +1,19 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Ramadoka.Parser.LispVal
 (
-  readExpr,
   getExpr,
   normalizeRational,
   LispVal(..),
   Number(..),
   eval,
 ) where
-  import Ramadoka.Parser.Number
-  import Text.ParserCombinators.Parsec hiding (spaces)
-  import Data.List
-  import System.Environment
   import Control.Monad as M
+  import Control.Monad.Error
+  import Data.List
   import Data.String.Interpolate
+  import Ramadoka.Parser.Number
+  import System.Environment
+  import Text.ParserCombinators.Parsec hiding (spaces)
 
   data LispVal = Number Number
     | Bool Bool
@@ -38,6 +38,36 @@ module Ramadoka.Parser.LispVal
 
   stringify :: [LispVal] -> String
   stringify xs = ((intercalate ", ") . (map show)) xs
+
+  data LispError = NumArgs Integer [LispVal]
+                  | TypeMismatch String LispVal
+                  | ParseError ParseError
+                  | BadSpecialForm String LispVal
+                  | NotFunction String String
+                  | UnboundVar String String
+                  | Default String
+
+  showError :: LispError -> String
+  showError (UnboundVar message varname) = [i|#{message}: #{varname}|]
+  showError (BadSpecialForm message form) = [i|#{message}: #{form}|]
+  showError (NotFunction message func) = [i|#{message}: #{func}|]
+  showError (NumArgs expected found) = [i|Expected: #{expected} args; found values: #{stringify found}|]
+  showError (TypeMismatch expected found) = [i|Invalid Type, expected: #{expected}, found: #{found}|]
+  showError (ParseError parseErr) = [i|Parse error at #{parseErr}|]
+
+  instance Show LispError where show = showError
+
+  instance Error LispError where
+    noMsg = Default "An error has occured"
+    strMsg = Default
+
+  type ThrowsError = Either LispError
+
+  trapError :: (Show a, MonadError a m) => m String -> m String
+  trapError action = catchError action (return . show)
+
+  extractValue :: ThrowsError a -> a
+  extractValue (Right val) = val
 
   escapeCharacters :: Parser Char
   escapeCharacters = do
@@ -190,10 +220,10 @@ module Ramadoka.Parser.LispVal
   eval x = Failure $ show x
 
   apply :: String -> [LispVal] -> LispVal
-  apply "+" = levitate (|+|)
-  apply "-" = levitate (|-|)
-  apply "*" = levitate (|*|)
-  apply "/" = levitate (|/|)
+  apply "+" = numericBinop (|+|)
+  apply "-" = numericBinop (|-|)
+  apply "*" = numericBinop (|*|)
+  apply "/" = numericBinop (|/|)
   apply "string?" = isString . head
   apply "number?" = isNumber . head
   apply "symbol?" = isSymbol . head
@@ -210,26 +240,26 @@ module Ramadoka.Parser.LispVal
   isNumber (Number _) = Bool True
   isNumber _ = Bool False
 
-  levitate :: (Number -> Number -> Number) -> [LispVal] -> LispVal
-  levitate op args = Number $ foldl1 op $ map unpackNum args
+  numericBinop :: (Number -> Number -> Number) -> [LispVal] -> LispVal
+  numericBinop op args = Number $ foldl1 op $ map unpackNum args
 
   unpackNum :: LispVal -> Number
   unpackNum (Number r@(Rational _ _)) = r
   unpackNum (Number i@(Integer _)) = i
   unpackNum (Number f@(Float _)) = f
 
-  getExpr :: String -> Either ParseError LispVal
-  getExpr = parse parseExpr "lisp"
+  getExpr :: String -> ThrowsError LispVal
+  getExpr input = case parse parseExpr "lisp" input of
+                    (Left err) -> throwError $ ParseError err
+                    (Right val) -> return val
+
 
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = [i|No Match: #{err}|]
   errPrint (Right val) = [i|Found Value: #{val}|]
 
-  readExpr :: String -> String
-  readExpr input = errPrint $ getExpr input
-
   main :: IO()
   main = do
     (expr:_) <- getArgs
-    print $ readExpr expr
+    print $ getExpr expr
 
