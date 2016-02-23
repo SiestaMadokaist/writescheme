@@ -95,8 +95,6 @@ module Ramadoka.Parser.LispVal
           char '.'
           skipMany spaces
 
-  -- Parser LispVal --
-
   parseFloat :: Integer -> Parser LispVal
   parseFloat i = do
     xs <- digitsDirectlyAfter '.'
@@ -108,13 +106,13 @@ module Ramadoka.Parser.LispVal
   parseIntPower base = do
     xs <- digitsDirectlyAfter 'e'
     let exponent = read xs :: Integer
-    return $ Number $ Integer $ base * (10 ^ exponent)
+    return $ Number $ Rational ( base * ( 10 ^ exponent ) ) 1
 
   parseFloatPower :: Float -> Parser LispVal
   parseFloatPower base = do
     xs <- digitsDirectlyAfter 'e'
     let exponent = read xs :: Float
-    return $ Number $ Float $ base * (10 ** exponent)
+    return $ Number $ Float ( base * ( 10 ** exponent ) )
 
   parseNumber :: Parser LispVal
   parseNumber = do
@@ -123,7 +121,7 @@ module Ramadoka.Parser.LispVal
         base = currentNumber
         numerator = currentNumber
         characteristic = currentNumber
-    (parseRational numerator) <|> (parseFloat characteristic) <|> (parseIntPower base) <|> (return $ Number $ Integer characteristic)
+    (parseRational numerator) <|> (parseFloat characteristic) <|> (parseIntPower base) <|> (return $ Number $ Rational characteristic 1)
 
   parseExactPoweredFloat :: Integer -> Integer -> Parser LispVal
   parseExactPoweredFloat numerator denominator = do
@@ -151,7 +149,7 @@ module Ramadoka.Parser.LispVal
     xs <- digitsDirectlyAfter 'e'
     let characteristic = read xs :: Integer
         numerator = characteristic
-    (parseRational numerator) <|> (parseIntPower characteristic) <|> (parseExactFloat characteristic) <|> (return $ Number $ Integer characteristic)
+    (parseRational numerator) <|> (parseIntPower characteristic) <|> (parseExactFloat characteristic) <|> (return $ Number $ Rational characteristic 1)
 
   parseInexactNumber :: Parser LispVal
   parseInexactNumber = do
@@ -222,24 +220,38 @@ module Ramadoka.Parser.LispVal
   eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
   apply :: String -> [LispVal] -> ThrowsError LispVal
-  apply "+" = numericBinop (|+|)
-  apply "-" = numericBinop (|-|)
-  apply "*" = numericBinop (|*|)
-  apply "/" = numericBinop (|/|)
+  apply "+" = numericBinOp (|+|)
+  apply "-" = numericBinOp (|-|)
+  apply "*" = numericBinOp (|*|)
+  apply "/" = numericBinOp (|/|)
+  apply "&&" = boolBoolBinOp (&&)
+  apply "||" = boolBoolBinOp (||)
+  --apply ">" = numBoolBinOp (|>|)
+  --apply "<" = numBoolBinOp (|<|)
+  --apply "==" = numBoolBinOp (|==|)
+  --apply ">=" = numBoolBinOp (|>=|)
+  --apply "<=" = numBoolBinOp (|<=|)
   apply "string?" = return . isString . head
   apply "number?" = return . isNumber . head
   apply "symbol?" = return . isSymbol . head
 
-  numericBinop :: (Number -> Number -> Number) -> [LispVal] -> ThrowsError LispVal
-  numericBinop op [] = throwError $ NumArgs 2 []
-  numericBinop op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
-  numericBinop op args = mapM unpackNum args >>= return . Number . foldl1 op
+  numericBinOp :: (Number -> Number -> Number) -> [LispVal] -> ThrowsError LispVal
+  numericBinOp op [] = throwError $ NumArgs 2 []
+  numericBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
+  numericBinOp op args = mapM unpackNum args >>= return . Number . foldl1 op
+
+  boolBoolBinOp :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
+  boolBoolBinOp op [] = throwError $ NumArgs 2 []
+  boolBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
+  boolBoolBinOp op xs = mapM unpackBool xs >>= return . Bool . foldl1 op
 
   unpackNum :: LispVal -> ThrowsError Number
   unpackNum (Number r@(Rational _ _)) = Right r
-  unpackNum (Number i@(Integer _)) = Right i
   unpackNum (Number f@(Float _)) = Right f
   unpackNum notNumber = throwError $ TypeMismatch "number" notNumber
+
+  unpackBool :: LispVal -> ThrowsError Bool
+  unpackBool (Bool x) = (Right x)
 
   isSymbol :: LispVal -> LispVal
   isSymbol (Atom _) = Bool True
@@ -267,5 +279,5 @@ module Ramadoka.Parser.LispVal
   main :: IO()
   main = do
     (expr:_) <- getArgs
-    print $ getExpr expr
+    print $ mapM eval (getExpr expr)
 

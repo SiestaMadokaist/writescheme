@@ -18,7 +18,7 @@ module Ramadoka.Parser.SchemerSpec where
   runEval input = unpackLispVal $ eval $ runParser input
 
   int :: Integer -> LispVal
-  int x = Number $ Integer x
+  int x = Number $ Rational x 1
 
   flt :: Float -> LispVal
   flt x = Number $ Float x
@@ -59,6 +59,31 @@ module Ramadoka.Parser.SchemerSpec where
             runEval "(number? (+ 2/5 3/5))" `shouldBe` Bool True
 
       describe "binOp" $ do
+        describe "boolean operation" $ do
+          describe "&&" $ do
+            it "is correct(1)" $ do
+              runEval "(&& #t #t)" `shouldBe` Bool True
+            it "is correct(2)" $ do
+              runEval "(&& #t #f)" `shouldBe` Bool False
+            it "is correct(3)" $ do
+              runEval "(&& #f #t)" `shouldBe` Bool False
+            it "is correct(4)" $ do
+              runEval "(&& #f #f)" `shouldBe` Bool False
+            it" is correct on multiple argument" $ do
+              runEval "(&& #f #f #t)" `shouldBe` Bool False
+
+          describe "||" $ do
+            it "is correct(1)" $ do
+              runEval "(|| #t #t)" `shouldBe` Bool True
+            it "is correct(2)" $ do
+              runEval "(|| #t #f)" `shouldBe` Bool True
+            it "is correct(3)" $ do
+              runEval "(|| #f #t)" `shouldBe` Bool True
+            it "is correct(4)" $ do
+              runEval "(|| #f #f)" `shouldBe` Bool False
+            it" is correct on multiple argument" $ do
+              runEval "(|| #f #f #t)" `shouldBe` Bool True
+
         describe "addition" $ do
           it "works between 2 integer" $ do
             runEval "(+ 2 2)" `shouldBe` int 4
@@ -74,11 +99,13 @@ module Ramadoka.Parser.SchemerSpec where
         describe "multiple evaluation" $ do
           it "works on nested expression" $ do
             runEval "(* 2 (+ 3 5))" `shouldBe` int 16
+          it "works for compettitive programming" $ do
+            runEval "(* 1/2 2/3 4/5 6/7)" `shouldBe` ratio 8 35
 
 
       describe "normalizeRational" $ do
         it "does correctly on trivial integer-like rational" $ do
-          normalizeRational 3 1 `shouldBe` Integer 3
+          normalizeRational 3 1 `shouldBe` Rational 3 1
         it "does trivial rational correctly" $ do
           normalizeRational 3 5 `shouldBe` Rational 3 5
         it "use gcd correctly" $ do
@@ -93,9 +120,9 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "parseNumber" $ do
         it "parse integer" $ do
-          runParser "3" `shouldBe` Number (Integer 3)
+          runParser "3" `shouldBe` (int 3)
         it "parse powered integer" $ do
-          runParser "3e2" `shouldBe` Number (Integer 300)
+          runParser "3e2" `shouldBe` (int 300)
         it "parse float" $ do
           runParser "3.2" `shouldBe` Number (Float 3.2)
         it "parse powered float" $ do
@@ -113,11 +140,11 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "parseExactNumber" $ do
         it "parse integer" $ do
-          runParser "#e3" `shouldBe` (Number $ Integer 3)
+          runParser "#e3" `shouldBe` int 3
         it "parse float" $ do
            runParser "#e3.2" `shouldBe` (Number $ Rational 16 5)
         it "parse powered integer" $ do
-          runParser "#e3e5" `shouldBe` (Number $ Integer 300000)
+          runParser "#e3e5" `shouldBe` (int 300000)
         -- it "parse powered float" $ do
           -- runParser "#e3.12e1" `shouldBe` (Number $ Rational 156 5)
 
@@ -125,7 +152,7 @@ module Ramadoka.Parser.SchemerSpec where
         it "parse variable of the same type" $ do
           runParser "(hello world)" `shouldBe` List [Atom "hello", Atom "world"]
         it "parse variable of different type" $ do
-          runParser "(hello \"world\" 5)" `shouldBe` List [Atom "hello",  String "world", Number (Integer 5)]
+          runParser "(hello \"world\" 5)" `shouldBe` List [Atom "hello",  String "world", (int 5)]
         it "parse nested list" $ do
           runParser "(hello (world))" `shouldBe` List [Atom "hello", List [Atom "world"] ]
         it "parse empty nested list" $ do
@@ -135,11 +162,11 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "parseQuoted" $ do
         it "parse single valued" $ do
-          runParser "`5" `shouldBe` List [Atom "quote", Number (Integer 5)]
+          runParser "`5" `shouldBe` List [Atom "quote", (int 5)]
         it "parse values inside list" $ do
           runParser "`(hello world)" `shouldBe` List [Atom "quote", List [Atom "hello", Atom "world"]]
           runParser "``hello" `shouldBe` List [Atom "quote", List [Atom "quote", Atom "hello"]]
 
       describe "parseDotted" $ do
         it "parse a simple list" $ do
-          runParser "(5 . 3)" `shouldBe` DottedList [Number (Integer 5), Number (Integer 3)]
+          runParser "(5 . 3)" `shouldBe` DottedList [(int 5), (int 3)]
