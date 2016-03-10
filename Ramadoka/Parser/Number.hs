@@ -6,6 +6,11 @@ module Ramadoka.Parser.Number
   (|/|),
   (|-|),
   (|*|),
+  -- (|>|),
+  -- (|<|),
+  -- (|==|),
+  -- (|>=|),
+  -- (|<=|)
 ) where
   import Text.ParserCombinators.Parsec hiding (spaces)
   import Data.List
@@ -33,11 +38,47 @@ module Ramadoka.Parser.Number
             dd1 = denominator normal1
             dd2 = denominator normal2
 
+  instance Ord Number where
+    (>) = (|>|)
+    (<) = (|<|)
+    (<=) = (|<=|)
+    (>=) = (|>=|)
+
   normalizeRational :: Integer -> Integer -> Number
   normalizeRational n d = Rational normalDividend normalDivisor
     where normalizer = gcd n d
           normalDividend = n `div` normalizer
           normalDivisor = d `div` normalizer
+
+  rationalCompare :: Number -> Number -> Ordering
+  (Rational n1 d1) `rationalCompare` (Rational n2 d2) =
+    let lcmd = lcm d1 d2
+        mul1 = lcmd `div` d1
+        mul2 = lcmd `div` d2
+        normal1 = n1 * mul1
+        normal2 = n2 * mul2
+    in compare normal1 normal2
+
+  (|>|) :: Number -> Number -> Bool
+  (Float f1) |>| (Float f2) = f1 > f2
+  (Float f) |>| (Rational n d) = f > (fromIntegral n) / (fromIntegral d)
+  (Rational n d) |>| (Float f) = (fromIntegral n) / (fromIntegral d) > f
+  r1@(Rational _ _) |>| r2@(Rational _ _) = rationalCompare r1 r2 == GT
+
+  (|<|) :: Number -> Number -> Bool
+  (Float f1) |<| (Float f2) = f1 < f2
+  (Float f) |<| (Rational n d) = f < (fromIntegral n) / (fromIntegral d)
+  (Rational n d) |<| (Float f) = (fromIntegral n) / (fromIntegral d) < f
+  r1@(Rational _ _) |<| r2@(Rational _ _) = rationalCompare r1 r2 == LT
+
+  (|<=|) :: Number -> Number -> Bool
+  (|<=|) num = not . (|>| num)
+
+  (|>=|) :: Number -> Number -> Bool
+  (|>=|) num = not . (|<| num)
+
+  (|==|) :: Number -> Number -> Bool
+  (Rational n1 d1) |==| (Rational n2 d2) = False
 
   (|+|) :: Number -> Number -> Number
   Rational n1 d1 |+| Rational n2 d2   = normalizeRational normalN normalD

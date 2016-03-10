@@ -226,14 +226,23 @@ module Ramadoka.Parser.LispVal
   apply "/" = numericBinOp (|/|)
   apply "&&" = boolBoolBinOp (&&)
   apply "||" = boolBoolBinOp (||)
-  --apply ">" = numBoolBinOp (|>|)
-  --apply "<" = numBoolBinOp (|<|)
-  --apply "==" = numBoolBinOp (|==|)
-  --apply ">=" = numBoolBinOp (|>=|)
-  --apply "<=" = numBoolBinOp (|<=|)
+  apply ">" = numBoolBinOp (>)
+  apply "<" = numBoolBinOp (<)
+  apply "==" = numBoolBinOp (==)
+  apply ">=" = numBoolBinOp (>=)
+  apply "<=" = numBoolBinOp (<=)
   apply "string?" = return . isString . head
   apply "number?" = return . isNumber . head
   apply "symbol?" = return . isSymbol . head
+
+  numBoolBinOp :: (Number -> Number -> Bool) -> [LispVal] -> ThrowsError LispVal
+  numBoolBinOp op [] = throwError $ NumArgs 2 []
+  numBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
+  numBoolBinOp op (x':y':[]) = do
+      x <- unpackNum x'
+      y <- unpackNum y'
+      return $ Bool $ op x y
+  numBoolBinOp op multiVal@(_:_:_) = throwError $ NumArgs 2 multiVal
 
   numericBinOp :: (Number -> Number -> Number) -> [LispVal] -> ThrowsError LispVal
   numericBinOp op [] = throwError $ NumArgs 2 []

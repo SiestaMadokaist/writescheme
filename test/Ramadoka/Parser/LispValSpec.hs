@@ -60,6 +60,25 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "binOp" $ do
         describe "boolean operation" $ do
+          describe ">" $ do
+            it "correctly compare rational and rational" $ do
+              runEval "(> 5 3)" `shouldBe` Bool True
+            it "correctly compare rational and float" $ do
+              runEval "(> #e5.3 #i5.2)" `shouldBe` Bool True
+            it "correctly compare float and float" $ do
+              runEval "(> #i5.3 #i5.2)" `shouldBe` Bool True
+            it "correctly compare float and rational" $ do
+              runEval "(> #i5.3 #e5.4)" `shouldBe` Bool False
+              runEval "(> #e5.2 #e5.2)" `shouldBe` Bool False
+          describe "<" $ do
+            it "correctly compare rational and rational" $ do
+              runEval "(< #e5.2 #e5.001)" `shouldBe` Bool False
+            it "correctly compare rational and float" $ do
+              runEval "(< #e5.1 #i5.5)" `shouldBe` Bool True
+            it "correctly compare float and rational" $ do
+              runEval "(< #i5.0 #e5.1)"`shouldBe` Bool True
+            it "correctly compare float and float" (pendingWith "trivial")
+
           describe "&&" $ do
             it "is correct(1)" $ do
               runEval "(&& #t #t)" `shouldBe` Bool True
