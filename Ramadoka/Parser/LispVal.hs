@@ -216,8 +216,13 @@ module Ramadoka.Parser.LispVal
   eval val@(Number _) = return val
   eval val@(String _) = return val
   eval (List [Atom "quote", expr]) = return expr
+  eval (List [Atom "if", pred, cons, alt]) = (eval pred) >>= (\x -> evalIf x cons alt)
   eval (List (Atom func : exprs)) = mapM eval exprs >>= apply func
   eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+  evalIf :: LispVal -> LispVal -> LispVal -> ThrowsError LispVal
+  evalIf (Bool True)  cons _ = eval cons
+  evalIf (Bool False)  _ alt = eval alt
 
   apply :: String -> [LispVal] -> ThrowsError LispVal
   apply "+" = numericBinOp (|+|)

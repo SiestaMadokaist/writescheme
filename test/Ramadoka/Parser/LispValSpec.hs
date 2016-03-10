@@ -30,6 +30,11 @@ module Ramadoka.Parser.SchemerSpec where
   spec = do
 
     describe "evaluation" $ do
+      describe "if" $ do
+        it "run correctly on #t" $ do
+          runEval "(if (> 5 3) `a `b)" `shouldBe` Atom "a"
+        it "run correctly on #f" $ do
+          runEval "(if (> 5 9) 3 2)" `shouldBe` ratio 2 1
       describe "unOp" $ do
         describe "symbol?" $ do
           it "return false on quoted empty list" $ do
