@@ -231,17 +231,30 @@ module Ramadoka.Parser.LispVal
   apply "==" = numBoolBinOp (==)
   apply ">=" = numBoolBinOp (>=)
   apply "<=" = numBoolBinOp (<=)
+  apply "string<?" = strBoolBinOp (<)
+  apply "string=?" = strBoolBinOp (==)
+  apply "string>?" = strBoolBinOp (>)
+  apply "string>=?" = strBoolBinOp (>=)
+  apply "string<=?" = strBoolBinOp (<=)
   apply "string?" = return . isString . head
   apply "number?" = return . isNumber . head
   apply "symbol?" = return . isSymbol . head
+
+  strBoolBinOp :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
+  strBoolBinOp op [] = throwError $ NumArgs 2 []
+  strBoolBinOp op singleVal@(_:[]) = throwError $ NumArgs 2 singleVal
+  strBoolBinOp op (s1:s2:[]) = do
+    ss1 <- unpackStr s1
+    ss2 <- unpackStr s2
+    return $ Bool $ op ss1 ss2
 
   numBoolBinOp :: (Number -> Number -> Bool) -> [LispVal] -> ThrowsError LispVal
   numBoolBinOp op [] = throwError $ NumArgs 2 []
   numBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
   numBoolBinOp op (x':y':[]) = do
-      x <- unpackNum x'
-      y <- unpackNum y'
-      return $ Bool $ op x y
+    x <- unpackNum x'
+    y <- unpackNum y'
+    return $ Bool $ op x y
   numBoolBinOp op multiVal@(_:_:_) = throwError $ NumArgs 2 multiVal
 
   numericBinOp :: (Number -> Number -> Number) -> [LispVal] -> ThrowsError LispVal
@@ -253,6 +266,10 @@ module Ramadoka.Parser.LispVal
   boolBoolBinOp op [] = throwError $ NumArgs 2 []
   boolBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
   boolBoolBinOp op xs = mapM unpackBool xs >>= return . Bool . foldl1 op
+
+  unpackStr :: LispVal -> ThrowsError String
+  unpackStr (String s) = Right s
+  unpackStr notString = throwError $ TypeMismatch "string" notString
 
   unpackNum :: LispVal -> ThrowsError Number
   unpackNum (Number r@(Rational _ _)) = Right r

@@ -60,6 +60,10 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "binOp" $ do
         describe "boolean operation" $ do
+          describe "string>?" $ do
+            it "correctly compare" $ do
+              runEval "(string>? \"a\" \"b\")" `shouldBe` Bool False
+              runEval "(string<? \"a\" \"b\")" `shouldBe` Bool True
           describe ">" $ do
             it "correctly compare rational and rational" $ do
               runEval "(> 5 3)" `shouldBe` Bool True

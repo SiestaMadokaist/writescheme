@@ -6,11 +6,6 @@ module Ramadoka.Parser.Number
   (|/|),
   (|-|),
   (|*|),
-  -- (|>|),
-  -- (|<|),
-  -- (|==|),
-  -- (|>=|),
-  -- (|<=|)
 ) where
   import Text.ParserCombinators.Parsec hiding (spaces)
   import Data.List
@@ -18,8 +13,6 @@ module Ramadoka.Parser.Number
   import Control.Monad as M
   import Data.String.Interpolate
 
-  -- TODO:
-  -- refactor all Integer to Rational
   data Number = Float Float
     | Rational {numerator :: Integer, denominator :: Integer}
 
