@@ -45,27 +45,33 @@ module Ramadoka.Parser.Number
           normalDivisor = d `div` normalizer
 
   rationalCompare :: Number -> Number -> Ordering
-  (Rational n1 d1) `rationalCompare` (Rational n2 d2) =
+  r1@(Rational _ _) `rationalCompare` r2@(Rational _ _) =
+    let (normal1, normal2) = relativeValues r1 r2
+        in compare normal1 normal2
+
+  relativeValues :: Number -> Number -> (Integer, Integer)
+  relativeValues (Rational n1 d1) (Rational n2 d2) =
     let lcmd = lcm d1 d2
         mul1 = lcmd `div` d1
         mul2 = lcmd `div` d2
         normal1 = n1 * mul1
         normal2 = n2 * mul2
-    in compare normal1 normal2
+        in (normal1, normal2)
 
   createComparator :: (forall a . Ord a => a -> a -> Bool) -> Number -> Number -> Bool
   createComparator comparator (Float f1) (Float f2) = comparator f1 f2
   createComparator comparator (Float f) (Rational n d) = comparator f $ (fromIntegral n) / (fromIntegral d)
   createComparator comparator (Rational n d) (Float f) = comparator ((fromIntegral n) / (fromIntegral d)) f
-  createComparator comparator (Rational n1 d1) (Rational n2 d2) = True -- TODO
+  createComparator comparator r1@(Rational _ _) r2@(Rational _ _)=
+    let (normal1, normal2) = relativeValues r1 r2
+        in comparator normal1 normal2
+
 
   (|>|) :: Number -> Number -> Bool
   (|>|) = createComparator (>)
-  -- r1@(Rational _ _) |>| r2@(Rational _ _) = rationalCompare r1 r2 == GT
 
   (|<|) :: Number -> Number -> Bool
   (|<|) = createComparator (<)
-  -- r1@(Rational _ _) |<| r2@(Rational _ _) = rationalCompare r1 r2 == LT
 
   (|<=|) :: Number -> Number -> Bool
   (|<=|) num = not . (|>| num)
