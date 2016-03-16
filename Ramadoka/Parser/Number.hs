@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 module Ramadoka.Parser.Number
 (
   Number(..),
@@ -52,17 +53,19 @@ module Ramadoka.Parser.Number
         normal2 = n2 * mul2
     in compare normal1 normal2
 
+  createComparator :: (forall a . Ord a => a -> a -> Bool) -> Number -> Number -> Bool
+  createComparator comparator (Float f1) (Float f2) = comparator f1 f2
+  createComparator comparator (Float f) (Rational n d) = comparator f $ (fromIntegral n) / (fromIntegral d)
+  createComparator comparator (Rational n d) (Float f) = comparator ((fromIntegral n) / (fromIntegral d)) f
+  createComparator comparator (Rational n1 d1) (Rational n2 d2) = True -- TODO
+
   (|>|) :: Number -> Number -> Bool
-  (Float f1) |>| (Float f2) = f1 > f2
-  (Float f) |>| (Rational n d) = f > (fromIntegral n) / (fromIntegral d)
-  (Rational n d) |>| (Float f) = (fromIntegral n) / (fromIntegral d) > f
-  r1@(Rational _ _) |>| r2@(Rational _ _) = rationalCompare r1 r2 == GT
+  (|>|) = createComparator (>)
+  -- r1@(Rational _ _) |>| r2@(Rational _ _) = rationalCompare r1 r2 == GT
 
   (|<|) :: Number -> Number -> Bool
-  (Float f1) |<| (Float f2) = f1 < f2
-  (Float f) |<| (Rational n d) = f < (fromIntegral n) / (fromIntegral d)
-  (Rational n d) |<| (Float f) = (fromIntegral n) / (fromIntegral d) < f
-  r1@(Rational _ _) |<| r2@(Rational _ _) = rationalCompare r1 r2 == LT
+  (|<|) = createComparator (<)
+  -- r1@(Rational _ _) |<| r2@(Rational _ _) = rationalCompare r1 r2 == LT
 
   (|<=|) :: Number -> Number -> Bool
   (|<=|) num = not . (|>| num)

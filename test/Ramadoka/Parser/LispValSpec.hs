@@ -30,6 +30,9 @@ module Ramadoka.Parser.SchemerSpec where
   spec = do
 
     describe "evaluation" $ do
+      describe "car" $ do
+        it "return the first element" $ do
+          runEval "(car `(5 3 2))" `shouldBe` ratio 5 1
       describe "if" $ do
         it "run correctly on #t" $ do
           runEval "(if (> 5 3) `a `b)" `shouldBe` Atom "a"
@@ -69,6 +72,7 @@ module Ramadoka.Parser.SchemerSpec where
             it "correctly compare" $ do
               runEval "(string>? \"a\" \"b\")" `shouldBe` Bool False
               runEval "(string<? \"a\" \"b\")" `shouldBe` Bool True
+
           describe ">" $ do
             it "correctly compare rational and rational" $ do
               runEval "(> 5 3)" `shouldBe` Bool True
@@ -79,6 +83,7 @@ module Ramadoka.Parser.SchemerSpec where
             it "correctly compare float and rational" $ do
               runEval "(> #i5.3 #e5.4)" `shouldBe` Bool False
               runEval "(> #e5.2 #e5.2)" `shouldBe` Bool False
+
           describe "<" $ do
             it "correctly compare rational and rational" $ do
               runEval "(< #e5.2 #e5.001)" `shouldBe` Bool False
@@ -173,8 +178,8 @@ module Ramadoka.Parser.SchemerSpec where
            runParser "#e3.2" `shouldBe` (Number $ Rational 16 5)
         it "parse powered integer" $ do
           runParser "#e3e5" `shouldBe` (int 300000)
-        -- it "parse powered float" $ do
-          -- runParser "#e3.12e1" `shouldBe` (Number $ Rational 156 5)
+        it "parse powered float" $ do
+          runParser "#e3.12e1" `shouldBe` (Number $ Rational 156 5)
 
       describe "parseList" $ do
         it "parse variable of the same type" $ do
@@ -197,4 +202,4 @@ module Ramadoka.Parser.SchemerSpec where
 
       describe "parseDotted" $ do
         it "parse a simple list" $ do
-          runParser "(5 . 3)" `shouldBe` DottedList [(int 5), (int 3)]
+          runParser "(dotted ~ list)" `shouldBe` DottedList [Atom "dotted"] (Atom "list")

@@ -15,6 +15,7 @@ module Ramadoka.Parser.LispVal
   import Ramadoka.Parser.Number
   import System.Environment
   import Text.ParserCombinators.Parsec hiding (spaces)
+  import System.IO
 
   data LispError = NumArgs Integer [LispVal]
                   | TypeMismatch String LispVal
@@ -31,7 +32,7 @@ module Ramadoka.Parser.LispVal
     | Char Char
     | String String
     | List [LispVal]
-    | DottedList [LispVal]
+    | DottedList [LispVal] LispVal
     | Failure LispError
     deriving (Eq)
 
@@ -41,7 +42,7 @@ module Ramadoka.Parser.LispVal
     show (Char c) = show c
     show (String s) = [i|`#{s}`|]
     show (List l) = [i|(#{stringify l})|]
-    show (DottedList l) = [i|Dotted (#{stringify l})|]
+    show (DottedList l v) = [i|Dotted (#{stringify l} . #{v})|]
     show (Number n) = show n
     show (Atom s) = [i|Atom #{s}|]
     show (Failure s) = [i|Failure #{s}|]
@@ -187,19 +188,23 @@ module Ramadoka.Parser.LispVal
     char '"'
     return $ String xs
 
+  parseListInner :: Parser LispVal
+  parseListInner = do
+    exprs <- (try (sepBy parseExpr spaces))
+    return $ List exprs
+
   parseList :: Parser LispVal
   parseList = do
     char '('
-    exprs <- sepBy parseExpr spaces
+    exprs <- parseListInner <|> parseDottedList
     char ')'
-    return $ List exprs
+    return exprs
 
   parseDottedList :: Parser LispVal
   parseDottedList = do
-    char '('
-    exprs <- sepBy parseExpr spaceOrDots
-    char ')'
-    return $ DottedList exprs
+    head <- endBy parseExpr spaces
+    tail <- char '~' >> spaces >> parseExpr
+    return $ DottedList head tail
 
   parseQuoted :: Parser LispVal
   parseQuoted = do
@@ -208,7 +213,7 @@ module Ramadoka.Parser.LispVal
     return $ List [Atom "quote", expr]
 
   parseExpr :: Parser LispVal
-  parseExpr = parseSymbolic <|> (parseFloat 0) <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> (try parseList) <|> (try parseDottedList)
+  parseExpr = parseSymbolic <|> (parseFloat 0) <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> parseList
 
   -- end of parser --
   eval :: LispVal -> ThrowsError LispVal
@@ -230,6 +235,9 @@ module Ramadoka.Parser.LispVal
   apply "*" = numericBinOp (|*|)
   apply "/" = numericBinOp (|/|)
   apply "&&" = boolBoolBinOp (&&)
+  apply "car" = car
+  apply "cdr" = cdr
+  apply "cons" = cons
   apply "||" = boolBoolBinOp (||)
   apply ">" = numBoolBinOp (>)
   apply "<" = numBoolBinOp (<)
@@ -244,6 +252,25 @@ module Ramadoka.Parser.LispVal
   apply "string?" = return . isString . head
   apply "number?" = return . isNumber . head
   apply "symbol?" = return . isSymbol . head
+
+  car :: [LispVal] -> ThrowsError LispVal
+  car [List (x:xs)] = return x
+  car [DottedList (x:xs) _ ] = return $ List xs
+  car [notList] = throwError $ TypeMismatch "list" notList
+  -- car badArgsList = throwError $ NumArgs 1 badArgsList
+
+  cdr :: [LispVal] -> ThrowsError LispVal
+  cdr [List (x:xs)] = return $ List xs
+  cdr [DottedList (_:xs) y] = return $ DottedList xs y
+  cdr [DottedList [_] y] = return y
+  cdr [notList] = throwError $ TypeMismatch "list" notList
+  cdr badArgsList = throwError $ NumArgs 1 badArgsList
+
+  cons :: [LispVal] -> ThrowsError LispVal
+  cons [x, (List xs)] = return $ List (x:xs)
+  cons [x, (DottedList xs xlast)] = return $ DottedList (x:xs) xlast
+  cons [x1, x2] = return $ DottedList [x1] x2
+  cons badArgsList = throwError $ NumArgs 2 badArgsList
 
   strBoolBinOp :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
   strBoolBinOp op [] = throwError $ NumArgs 2 []
@@ -303,12 +330,35 @@ module Ramadoka.Parser.LispVal
   handleParseError (Left err) = throwError $ ParseError err
   handleParseError (Right val) = return val
 
+  flushStr :: String -> IO()
+  flushStr str = putStr str >> hFlush stdout
+
+  readPrompt :: String -> IO(String)
+  readPrompt prompt = flushStr prompt >> getLine
+
+  evalString :: String -> IO(String)
+  evalString expr = return $ extractValue $ trapError (liftM show $ getExpr expr >>= eval)
+
+  evalAndPrint :: String -> IO()
+  evalAndPrint expr = evalString expr >>= putStrLn
+
+  until_ :: (a -> Bool) -> IO a -> (a -> IO ()) -> IO ()
+  until_ pred prompt action = do
+    result <- prompt
+    if(pred result)
+    then return ()
+    else action result >> until_ pred prompt action
+
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = [i|No Match: #{err}|]
   errPrint (Right val) = [i|Found Value: #{val}|]
 
+  runRepl :: IO()
+  runRepl = until_ (== "quit") (readPrompt "Lisp>>>") evalAndPrint
+
   main :: IO()
   main = do
-    (expr:_) <- getArgs
-    print $ mapM eval (getExpr expr)
-
+    args <- getArgs
+    case length args of
+      0 -> runRepl
+      1 -> print $ mapM eval (getExpr $ head args)
