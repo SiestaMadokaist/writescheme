@@ -48,7 +48,7 @@ module Ramadoka.Parser.LispVal
     show (Failure s) = [i|Failure #{s}|]
 
   stringify :: [LispVal] -> String
-  stringify xs = ((intercalate ", ") . (map show)) xs
+  stringify = intercalate ", " . map show
 
   showError :: LispError -> String
   showError (UnboundVar message varname) = [i|#{message}: #{varname}|]
@@ -75,8 +75,7 @@ module Ramadoka.Parser.LispVal
   escapeCharacters :: Parser Char
   escapeCharacters = do
     char '\\'
-    x <- oneOf "\\\"nrt"
-    return x
+    oneOf "\\\"nrt"
 
   symbol :: Parser Char
   symbol = oneOf "!$%&|*+-/:<=>?@^_-"
@@ -84,8 +83,7 @@ module Ramadoka.Parser.LispVal
   digitsDirectlyAfter :: Char -> Parser String
   digitsDirectlyAfter c = do
     char c
-    xs <- many1 digit
-    return xs
+    many1 digit
 
   spaces :: Parser ()
   spaces = skipMany1 space
@@ -101,7 +99,7 @@ module Ramadoka.Parser.LispVal
     xs <- digitsDirectlyAfter '.'
     let mantissa = read ("0." ++ xs)
         currentResult = return $ Number $ Float (fromIntegral i + mantissa)
-    (parseFloatPower $ fromIntegral i + mantissa) <|> currentResult
+    parseFloatPower (fromIntegral i + mantissa) <|> currentResult
 
   parseIntPower :: Integer -> Parser LispVal
   parseIntPower base = do
@@ -122,13 +120,13 @@ module Ramadoka.Parser.LispVal
         base = currentNumber
         numerator = currentNumber
         characteristic = currentNumber
-    (parseRational numerator) <|> (parseFloat characteristic) <|> (parseIntPower base) <|> (return $ Number $ Rational characteristic 1)
+    parseRational numerator <|> parseFloat characteristic <|> parseIntPower base <|> return (Number $ Rational characteristic 1)
 
   parseExactPoweredFloat :: Integer -> Integer -> Parser LispVal
   parseExactPoweredFloat numerator denominator = do
     xs <- digitsDirectlyAfter 'e'
     let exponent = read xs :: Integer
-    return $ Number $ normalizeRational (numerator * 10 ^ exponent) (denominator)
+    return $ Number $ normalizeRational (numerator * 10 ^ exponent) denominator
 
   parseExactFloat :: Integer -> Parser LispVal
   parseExactFloat characteristic = do
@@ -136,8 +134,8 @@ module Ramadoka.Parser.LispVal
     let mantissa = read xs :: Integer
         exponent = length xs
         denominator = 10 ^ exponent
-        numerator = ((characteristic * denominator) + mantissa)
-    (parseExactPoweredFloat numerator denominator) <|> (return $ Number $ normalizeRational numerator denominator)
+        numerator = characteristic * denominator + mantissa
+    parseExactPoweredFloat numerator denominator <|> return (Number $ normalizeRational numerator denominator)
 
   parseRational :: Integer -> Parser LispVal
   parseRational numerator = do
@@ -150,14 +148,14 @@ module Ramadoka.Parser.LispVal
     xs <- digitsDirectlyAfter 'e'
     let characteristic = read xs :: Integer
         numerator = characteristic
-    (parseRational numerator) <|> (parseIntPower characteristic) <|> (parseExactFloat characteristic) <|> (return $ Number $ Rational characteristic 1)
+    parseRational numerator <|> parseIntPower characteristic <|> parseExactFloat characteristic <|> return (Number $ Rational characteristic 1)
 
   parseInexactNumber :: Parser LispVal
   parseInexactNumber = do
     xs <- digitsDirectlyAfter 'i'
     let characteristic = read xs :: Float
         directResult = return $ Number $ Float characteristic
-    (parseFloatPower characteristic) <|> (parseFloat $ floor characteristic) <|> (directResult)
+    parseFloatPower characteristic <|> parseFloat (floor characteristic) <|> directResult
 
   parseTrue :: Parser LispVal
   parseTrue = do
@@ -190,7 +188,7 @@ module Ramadoka.Parser.LispVal
 
   parseListInner :: Parser LispVal
   parseListInner = do
-    exprs <- (try (sepBy parseExpr spaces))
+    exprs <- try (sepBy parseExpr spaces)
     return $ List exprs
 
   parseList :: Parser LispVal
@@ -213,7 +211,7 @@ module Ramadoka.Parser.LispVal
     return $ List [Atom "quote", expr]
 
   parseExpr :: Parser LispVal
-  parseExpr = parseSymbolic <|> (parseFloat 0) <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> parseList
+  parseExpr = parseSymbolic <|> parseFloat 0 <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> parseList
 
   -- end of parser --
   eval :: LispVal -> ThrowsError LispVal
@@ -221,7 +219,7 @@ module Ramadoka.Parser.LispVal
   eval val@(Number _) = return val
   eval val@(String _) = return val
   eval (List [Atom "quote", expr]) = return expr
-  eval (List [Atom "if", pred, cons, alt]) = (eval pred) >>= (\x -> evalIf x cons alt)
+  eval (List [Atom "if", pred, cons, alt]) = eval pred >>= (\x -> evalIf x cons alt)
   eval (List (Atom func : exprs)) = mapM eval exprs >>= apply func
   eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
@@ -267,23 +265,23 @@ module Ramadoka.Parser.LispVal
   cdr badArgsList = throwError $ NumArgs 1 badArgsList
 
   cons :: [LispVal] -> ThrowsError LispVal
-  cons [x, (List xs)] = return $ List (x:xs)
-  cons [x, (DottedList xs xlast)] = return $ DottedList (x:xs) xlast
+  cons [x, List xs] = return $ List (x:xs)
+  cons [x, DottedList xs xlast] = return $ DottedList (x:xs) xlast
   cons [x1, x2] = return $ DottedList [x1] x2
   cons badArgsList = throwError $ NumArgs 2 badArgsList
 
   strBoolBinOp :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
   strBoolBinOp op [] = throwError $ NumArgs 2 []
-  strBoolBinOp op singleVal@(_:[]) = throwError $ NumArgs 2 singleVal
-  strBoolBinOp op (s1:s2:[]) = do
+  strBoolBinOp op singleVal@[_] = throwError $ NumArgs 2 singleVal
+  strBoolBinOp op [s1, s2] = do
     ss1 <- unpackStr s1
     ss2 <- unpackStr s2
     return $ Bool $ op ss1 ss2
 
   numBoolBinOp :: (Number -> Number -> Bool) -> [LispVal] -> ThrowsError LispVal
   numBoolBinOp op [] = throwError $ NumArgs 2 []
-  numBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
-  numBoolBinOp op (x':y':[]) = do
+  numBoolBinOp op singleVal@[x] = throwError $ NumArgs 2 singleVal
+  numBoolBinOp op [x', y'] = do
     x <- unpackNum x'
     y <- unpackNum y'
     return $ Bool $ op x y
@@ -291,13 +289,13 @@ module Ramadoka.Parser.LispVal
 
   numericBinOp :: (Number -> Number -> Number) -> [LispVal] -> ThrowsError LispVal
   numericBinOp op [] = throwError $ NumArgs 2 []
-  numericBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
-  numericBinOp op args = mapM unpackNum args >>= return . Number . foldl1 op
+  numericBinOp op singleVal@[x] = throwError $ NumArgs 2 singleVal
+  numericBinOp op args = liftM (Number . foldl1 op) $ mapM unpackNum args
 
   boolBoolBinOp :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
   boolBoolBinOp op [] = throwError $ NumArgs 2 []
-  boolBoolBinOp op singleVal@(x:[]) = throwError $ NumArgs 2 singleVal
-  boolBoolBinOp op xs = mapM unpackBool xs >>= return . Bool . foldl1 op
+  boolBoolBinOp op singleVal@[x] = throwError $ NumArgs 2 singleVal
+  boolBoolBinOp op xs = liftM (Bool . foldl1 op) $ mapM unpackBool xs
 
   unpackStr :: LispVal -> ThrowsError String
   unpackStr (String s) = Right s
@@ -309,7 +307,7 @@ module Ramadoka.Parser.LispVal
   unpackNum notNumber = throwError $ TypeMismatch "number" notNumber
 
   unpackBool :: LispVal -> ThrowsError Bool
-  unpackBool (Bool x) = (Right x)
+  unpackBool (Bool x) = Right x
 
   isSymbol :: LispVal -> LispVal
   isSymbol (Atom _) = Bool True
@@ -333,10 +331,10 @@ module Ramadoka.Parser.LispVal
   flushStr :: String -> IO()
   flushStr str = putStr str >> hFlush stdout
 
-  readPrompt :: String -> IO(String)
+  readPrompt :: String -> IO String
   readPrompt prompt = flushStr prompt >> getLine
 
-  evalString :: String -> IO(String)
+  evalString :: String -> IO String
   evalString expr = return $ extractValue $ trapError (liftM show $ getExpr expr >>= eval)
 
   evalAndPrint :: String -> IO()
@@ -345,9 +343,7 @@ module Ramadoka.Parser.LispVal
   until_ :: (a -> Bool) -> IO a -> (a -> IO ()) -> IO ()
   until_ pred prompt action = do
     result <- prompt
-    if(pred result)
-    then return ()
-    else action result >> until_ pred prompt action
+    unless (pred result) $ action result >> until_ pred prompt action
 
   errPrint :: (Show a) => Either a LispVal -> String
   errPrint (Left err) = [i|No Match: #{err}|]
