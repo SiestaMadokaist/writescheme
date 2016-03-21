@@ -18,13 +18,13 @@ module Ramadoka.Parser.LispVal
   import System.IO
 
   data LispError = NumArgs Integer [LispVal]
-                  | TypeMismatch String LispVal
-                  | ParseError ParseError
-                  | BadSpecialForm String LispVal
-                  | NotFunction String String
-                  | UnboundVar String String
-                  | Default String
-                  deriving (Eq)
+    | TypeMismatch String LispVal
+    | ParseError ParseError
+    | BadSpecialForm String LispVal
+    | NotFunction String String
+    | UnboundVar String String
+    | Default String
+    deriving (Eq)
 
   data LispVal = Number Number
     | Bool Bool
@@ -90,9 +90,9 @@ module Ramadoka.Parser.LispVal
 
   spaceOrDots :: Parser ()
   spaceOrDots = do
-          skipMany spaces
-          char '.'
-          skipMany spaces
+    skipMany spaces
+    char '.'
+    skipMany spaces
 
   parseFloat :: Integer -> Parser LispVal
   parseFloat i = do
