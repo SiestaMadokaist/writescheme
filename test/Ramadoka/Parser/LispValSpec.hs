@@ -1,4 +1,4 @@
-module Ramadoka.Parser.SchemerSpec where
+module Ramadoka.Parser.LispValSpec where
   import Ramadoka.Parser.LispVal
   import Test.Hspec
 

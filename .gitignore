@@ -3,3 +3,5 @@
 hask_modules
 .cabal-sandbox/
 .docs
+dist
+.cabal-sandbox

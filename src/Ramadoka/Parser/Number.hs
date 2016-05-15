@@ -9,10 +9,10 @@ module Ramadoka.Parser.Number
   (|*|),
 ) where
   import Text.ParserCombinators.Parsec hiding (spaces)
-  import Data.List
-  import System.Environment
-  import Control.Monad as M
-  import Data.String.Interpolate
+  import Data.List()
+  import System.Environment()
+  import Control.Monad as M()
+  -- import Data.String.Interpolate()
   import Prelude
 
   data Number = Float {floatValue :: Float}
@@ -24,14 +24,7 @@ module Ramadoka.Parser.Number
     show (Rational x y) = show x ++ "/" ++ show y
 
   instance Eq Number where
-    Float f1 == Float f2              = f1 == f2
-    Rational n1 d1 == Rational n2 d2  = nn1 == nn2 && dd1 == dd2
-      where normal1 = normalizeRational n1 d1
-            normal2 = normalizeRational n2 d2
-            nn1 = numerator normal1
-            nn2 = numerator normal2
-            dd1 = denominator normal1
-            dd2 = denominator normal2
+    (==) = (|==|)
 
   instance Ord Number where
     (>) = (|>|)
@@ -45,12 +38,6 @@ module Ramadoka.Parser.Number
     where normalizer = gcd n d
           normalDividend = n `div` normalizer
           normalDivisor = d `div` normalizer
-
-  -- | e.g: rationalCompare (1/3) (3/5) => LT
-  rationalCompare :: Number -> Number -> Ordering
-  r1@(Rational _ _) `rationalCompare` r2@(Rational _ _) =
-    let (normal1, normal2) = relativeValues r1 r2
-        in compare normal1 normal2
 
   -- | e.g: relativeValues (11/4) (3/6) => (11, 2)
   -- | used to comparing two Rational
@@ -86,7 +73,10 @@ module Ramadoka.Parser.Number
   (|>=|) num = not . (|<| num)
 
   (|==|) :: Number -> Number -> Bool
-  (Rational n1 d1) |==| (Rational n2 d2) = False
+  (|==|) num1 num2 =
+    let r1 = not $ num1 |>| num2
+        r2 = not $ num1 |<| num2
+        in r1 && r2
 
   (|+|) :: Number -> Number -> Number
   Rational n1 d1 |+| Rational n2 d2   = normalizeRational normalN normalD
@@ -114,4 +104,4 @@ module Ramadoka.Parser.Number
           numerator = fN / fD
           denominator = f
   Float f1 |/| Float f2 = Float $ f1 / f2
-  r@(Rational _ _) |/| Rational n d = r |*| Rational d n
+  num |/| Rational n d = num |*| Rational d n

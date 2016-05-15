@@ -9,9 +9,10 @@ module Ramadoka.Parser.LispVal
   eval,
 ) where
   import Control.Monad as M
+  import Data.IORef
   import Control.Monad.Error
   import Data.List
-  import Data.String.Interpolate
+  -- import Data.String.Interpolate
   import Ramadoka.Parser.Number
   import System.Environment
   import Text.ParserCombinators.Parsec hiding (spaces)
@@ -36,27 +37,41 @@ module Ramadoka.Parser.LispVal
     | Failure LispError
     deriving (Eq)
 
+  type Env = IORef [(String, IORef LispVal)]
+
+  type IOThrowsError = ErrorT LispError IO
+
+  nullEnv :: IO Env
+  nullEnv = newIORef []
+
+  liftThrows :: ThrowsError a -> IOThrowsError a
+  liftThrows (Left err) = throwError err
+  liftThrows (Right val) = return val
+
+  runIOThrows :: IOThrowsError String -> IO String
+  runIOThrows action = runErrorT (trapError action) >>= return . extractValue
+
   instance Show LispVal where
     show (Bool True) = "#t"
     show (Bool False) = "#f"
     show (Char c) = show c
-    show (String s) = [i|`#{s}`|]
-    show (List l) = [i|(#{stringify l})|]
-    show (DottedList l v) = [i|Dotted (#{stringify l} . #{v})|]
+    show (String s) = "`" ++ s ++ "`"
+    show (List l) = "(" ++ stringify l ++ ")"
+    show (DottedList l v) = "Dotted (" ++ stringify l ++  "+" ++  show v ++ ")"
     show (Number n) = show n
-    show (Atom s) = [i|Atom #{s}|]
-    show (Failure s) = [i|Failure #{s}|]
+    show (Atom s) = "Atom " ++ s
+    show (Failure s) = "Failure " ++ show s
 
   stringify :: [LispVal] -> String
   stringify = intercalate ", " . map show
 
   showError :: LispError -> String
-  showError (UnboundVar message varname) = [i|#{message}: #{varname}|]
-  showError (BadSpecialForm message form) = [i|#{message}: #{form}|]
-  showError (NotFunction message func) = [i|#{message}: #{func}|]
-  showError (NumArgs expected found) = [i|Expected: #{expected} args; found values: #{stringify found}|]
-  showError (TypeMismatch expected found) = [i|Invalid Type, expected: #{expected}, found: #{found}|]
-  showError (ParseError parseErr) = [i|Parse error at #{parseErr}|]
+  showError (UnboundVar message varname) = message ++ ": "  ++ varname
+  showError (BadSpecialForm message form) = message ++ ": "  ++ show form
+  showError (NotFunction message func) = message ++ ": "  ++ show func
+  showError (NumArgs expected found) = "Expected: " ++ show expected ++ "args; found values: " ++ stringify found
+  showError (TypeMismatch expected found) = "Invalid Type, expected: " ++ show expected ++ ", found: " ++ show found
+  showError (ParseError parseErr) = "Parse error at " ++ show parseErr
 
   instance Show LispError where show = showError
 
@@ -346,8 +361,8 @@ module Ramadoka.Parser.LispVal
     unless (pred result) $ action result >> until_ pred prompt action
 
   errPrint :: (Show a) => Either a LispVal -> String
-  errPrint (Left err) = [i|No Match: #{err}|]
-  errPrint (Right val) = [i|Found Value: #{val}|]
+  errPrint (Left err) = "No Match:" ++ show err
+  errPrint (Right val) = "Found Value:" ++ show val
 
   runRepl :: IO()
   runRepl = until_ (== "quit") (readPrompt "Lisp>>>") evalAndPrint
