@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Ramadoka.Parser.LispVal
 (
-  getExpr,
+  readExpr,
   normalizeRational,
   LispVal(..),
   Number(..),
@@ -12,7 +12,6 @@ module Ramadoka.Parser.LispVal
   import Data.IORef
   import Control.Monad.Error
   import Data.List
-  -- import Data.String.Interpolate
   import Ramadoka.Parser.Number
   import System.Environment
   import Text.ParserCombinators.Parsec hiding (spaces)
@@ -72,6 +71,38 @@ module Ramadoka.Parser.LispVal
   showError (NumArgs expected found) = "Expected: " ++ show expected ++ "args; found values: " ++ stringify found
   showError (TypeMismatch expected found) = "Invalid Type, expected: " ++ show expected ++ ", found: " ++ show found
   showError (ParseError parseErr) = "Parse error at " ++ show parseErr
+
+  isBound :: Env -> String -> IO Bool
+  isBound envRef var = readIORef envRef >>= return . maybe False (const True) . lookup var
+
+  getVar :: Env -> String -> IOThrowsError LispVal
+  getVar envRef var = do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "unbound variable" var) (liftIO . readIORef) (lookup var env)
+
+  setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+  setVar envRef var value = do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "setting undefined var" var)
+          (liftIO . flip writeIORef value)
+          (lookup var env)
+    return value
+
+  defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+  defineVar envRef var value = do
+    alreadyDefined <- liftIO $ isBound envRef var
+    if alreadyDefined
+      then setVar envRef var value >> return value
+      else liftIO $ do
+        valueRef <- newIORef value
+        env <- readIORef envRef
+        writeIORef envRef ((var, valueRef) :env)
+        return value
+
+  bindVars :: Env -> [(String, LispVal)] -> IO Env
+  bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+    where extendEnv bindings env = liftM (++ env) (mapM addBindings bindings)
+          addBindings (var, value) = newIORef value >>= \val -> return (var, val)
 
   instance Show LispError where show = showError
 
@@ -229,18 +260,20 @@ module Ramadoka.Parser.LispVal
   parseExpr = parseSymbolic <|> parseFloat 0 <|> parseNumber <|> parseString <|> parseAtom <|> parseQuoted <|> parseList
 
   -- end of parser --
-  eval :: LispVal -> ThrowsError LispVal
-  eval val@(Bool _) = return val
-  eval val@(Number _) = return val
-  eval val@(String _) = return val
-  eval (List [Atom "quote", expr]) = return expr
-  eval (List [Atom "if", pred, cons, alt]) = eval pred >>= (\x -> evalIf x cons alt)
-  eval (List (Atom func : exprs)) = mapM eval exprs >>= apply func
-  eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+  eval :: Env -> LispVal -> ThrowsError LispVal
+  eval env val@(Bool _) = return val
+  eval env val@(Number _) = return val
+  eval env val@(String _) = return val
+  eval env (List [Atom "quote", expr]) = return expr
+  eval env (List [Atom "if", pred, cons, alt]) = eval env pred >>= (\result -> evalIf env result cons alt)
+  -- eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
+  -- eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
+  -- eval env (List (Atom func : exprs)) = mapM (eval env) exprs >>= liftThrows . apply func
+  -- eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
-  evalIf :: LispVal -> LispVal -> LispVal -> ThrowsError LispVal
-  evalIf (Bool True)  cons _ = eval cons
-  evalIf (Bool False)  _ alt = eval alt
+  evalIf :: Env -> LispVal -> LispVal -> LispVal -> ThrowsError LispVal
+  evalIf env (Bool True)  cons _ = eval env cons
+  evalIf env (Bool False)  _ alt = eval env alt
 
   apply :: String -> [LispVal] -> ThrowsError LispVal
   apply "+" = numericBinOp (|+|)
@@ -265,6 +298,7 @@ module Ramadoka.Parser.LispVal
   apply "string?" = return . isString . head
   apply "number?" = return . isNumber . head
   apply "symbol?" = return . isSymbol . head
+  apply fname = \_ -> throwError $ UnboundVar "no function defined as" fname
 
   car :: [LispVal] -> ThrowsError LispVal
   car [List (x:xs)] = return x
@@ -336,8 +370,8 @@ module Ramadoka.Parser.LispVal
   isNumber (Number _) = Bool True
   isNumber _ = Bool False
 
-  getExpr :: String -> ThrowsError LispVal
-  getExpr input = handleParseError $ parse parseExpr "lisp" input
+  readExpr :: String -> ThrowsError LispVal
+  readExpr input = handleParseError $ parse parseExpr "lisp" input
 
   handleParseError :: Either ParseError LispVal -> ThrowsError LispVal
   handleParseError (Left err) = throwError $ ParseError err
@@ -349,11 +383,11 @@ module Ramadoka.Parser.LispVal
   readPrompt :: String -> IO String
   readPrompt prompt = flushStr prompt >> getLine
 
-  evalString :: String -> IO String
-  evalString expr = return $ extractValue $ trapError (liftM show $ getExpr expr >>= eval)
+  evalString ::  Env -> String -> IO String
+  evalString env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr) `fmap` eval env
 
-  evalAndPrint :: String -> IO()
-  evalAndPrint expr = evalString expr >>= putStrLn
+  evalAndPrint :: Env -> String -> IO()
+  evalAndPrint env expr = evalString env expr >>= putStrLn
 
   until_ :: (a -> Bool) -> IO a -> (a -> IO ()) -> IO ()
   until_ pred prompt action = do
@@ -372,4 +406,4 @@ module Ramadoka.Parser.LispVal
     args <- getArgs
     case length args of
       0 -> runRepl
-      1 -> print $ mapM eval (getExpr $ head args)
+      1 -> print $ mapM eval (readExpr $ head args)
