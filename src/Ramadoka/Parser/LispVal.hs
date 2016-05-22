@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Ramadoka.Parser.LispVal
 (
-  getExpr,
+  readExpr,
   normalizeRational,
   LispVal(..),
   Number(..),
@@ -72,6 +72,38 @@ module Ramadoka.Parser.LispVal
   showError (NumArgs expected found) = "Expected: " ++ show expected ++ "args; found values: " ++ stringify found
   showError (TypeMismatch expected found) = "Invalid Type, expected: " ++ show expected ++ ", found: " ++ show found
   showError (ParseError parseErr) = "Parse error at " ++ show parseErr
+
+  isBound :: Env -> String -> IO Bool
+  isBound envRef var = readIORef envRef >>= return . maybe False (const True) . lookup var
+
+  getVar :: Env -> String -> IOThrowsError LispVal
+  getVar envRef var = do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "unbound variable" var) (liftIO . readIORef) (lookup var env)
+
+  setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+  setVar envRef var value = do
+    env <- liftIO $ readIORef envRef
+    maybe (throwError $ UnboundVar "setting undefined var" var)
+          (liftIO . flip writeIORef value)
+          (lookup var env)
+    return value
+
+  defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+  defineVar envRef var value = do
+    alreadyDefined <- liftIO $ isBound envRef var
+    if alreadyDefined
+      then setVar envRef var value >> return value
+      else liftIO $ do
+        valueRef <- newIORef value
+        env <- readIORef envRef
+        writeIORef envRef ((var, valueRef) :env)
+        return value
+
+  bindVars :: Env -> [(String, LispVal)] -> IO Env
+  bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
+    where extendEnv bindings env = liftM (++ env) (mapM addBindings bindings)
+          addBindings (var, value) = newIORef value >>= \val -> return (var, val)
 
   instance Show LispError where show = showError
 
@@ -336,8 +368,8 @@ module Ramadoka.Parser.LispVal
   isNumber (Number _) = Bool True
   isNumber _ = Bool False
 
-  getExpr :: String -> ThrowsError LispVal
-  getExpr input = handleParseError $ parse parseExpr "lisp" input
+  readExpr :: String -> ThrowsError LispVal
+  readExpr input = handleParseError $ parse parseExpr "lisp" input
 
   handleParseError :: Either ParseError LispVal -> ThrowsError LispVal
   handleParseError (Left err) = throwError $ ParseError err
@@ -350,7 +382,7 @@ module Ramadoka.Parser.LispVal
   readPrompt prompt = flushStr prompt >> getLine
 
   evalString :: String -> IO String
-  evalString expr = return $ extractValue $ trapError (liftM show $ getExpr expr >>= eval)
+  evalString expr = return $ extractValue $ trapError (liftM show $ readExpr expr >>= eval)
 
   evalAndPrint :: String -> IO()
   evalAndPrint expr = evalString expr >>= putStrLn
@@ -372,4 +404,4 @@ module Ramadoka.Parser.LispVal
     args <- getArgs
     case length args of
       0 -> runRepl
-      1 -> print $ mapM eval (getExpr $ head args)
+      1 -> print $ mapM eval (readExpr $ head args)
